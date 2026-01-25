@@ -102,14 +102,14 @@ if menu == "🔍 Screener":
 
     # ===== INIT SESSION STATE =====
     for key, default in {
-    "min_score": 50,
-    "min_gain": 2,
-    "price_range": (0, 10_000),
-    "last_screener": None,
-    "scanned_screener": None
+        "min_score": 50,
+        "min_gain": 2,
+        "price_range": (0, 10_000),
+        "last_screener": None,
+        "scanned_screener": None
     }.items():
-    if key not in st.session_state:
-        st.session_state[key] = default
+        if key not in st.session_state:
+            st.session_state[key] = default
 
     # ===== SIDEBAR =====
     st.sidebar.header("⚙️ Screener Settings")
