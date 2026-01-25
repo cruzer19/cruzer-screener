@@ -24,10 +24,12 @@ def _send_chunk(text: str):
     r = requests.post(TELEGRAM_API, json=payload, timeout=10)
 
     if not r.ok:
-        raise RuntimeError(
-            f"Telegram error {r.status_code}: {r.text}"
-        )
-
+            def _send_chunk(text):
+        r = requests.post(...)
+        if r.status_code != 200:
+            print("Telegram error:", r.status_code, r.text)
+            return False
+        return True
 
 # ==========================================================
 # PUBLIC SEND MESSAGE

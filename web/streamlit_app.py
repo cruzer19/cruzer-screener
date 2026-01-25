@@ -282,13 +282,15 @@ if menu == "🔍 Screener":
                 use_container_width=True,
                 key="btn_send_can_entry_telegram"
             ):
-                message = render_telegram(
-                    results=entry_now,
-                    #setup_source=setup_source
-                )
-                send_message(message)
-                st.success("CAN ENTRY terkirim ke Telegram ✅")
-
+                if not os.getenv("TELEGRAM_BOT_TOKEN") or not os.getenv("TELEGRAM_CHAT_ID"):
+                    st.error("Telegram belum dikonfigurasi (Secrets belum ada)")
+                else:
+                    message = render_telegram(
+                        results=entry_now,
+                        # setup_source=setup_source
+                    )
+                    send_message(message)
+                    st.success("CAN ENTRY terkirim ke Telegram ✅")
 
         st.subheader("🟡 WATCHLIST")
         df_watchlist = pd.DataFrame(watchlist)
