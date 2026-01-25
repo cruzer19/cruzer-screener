@@ -1,0 +1,18 @@
+SECTOR_BADGE = {
+    "BANK": "🏦",
+    "FINANCE": "💰",
+    "ENERGY": "⛏️",
+    "MINING": "⛏️",
+    "CONSUMER": "🛒",
+    "RETAIL": "🛒",
+    "PROPERTY": "🏘️",
+    "INFRA": "🛣️",
+    "TRANSPORT": "🚚",
+    "TECH": "💻",
+    "DIGITAL": "💻",
+    "TELECOM": "📡",
+    "MANUFACTURING": "🏭",
+    "AUTO": "🚗",
+    "SPECULATIVE": "🎢",
+    "OTHER": "📦",
+}
