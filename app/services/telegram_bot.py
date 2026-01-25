@@ -1,10 +1,10 @@
+import os
 import requests
-from app.config.settings import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 
 # ==========================================================
 # TELEGRAM CONFIG
 # ==========================================================
-TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+TELEGRAM_API = "https://api.telegram.org/bot{token}/sendMessage"
 
 # Telegram hard limit = 4096
 SAFE_LIMIT = 3800  # buffer aman biar gak silent fail
@@ -13,23 +13,23 @@ SAFE_LIMIT = 3800  # buffer aman biar gak silent fail
 # ==========================================================
 # INTERNAL SEND (1 CHUNK)
 # ==========================================================
-def _send_chunk(text: str):
+def _send_chunk(text: str, token: str, chat_id: str):
     payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
+        "chat_id": chat_id,
         "text": text,
         "parse_mode": "HTML",
         "disable_web_page_preview": True,
     }
 
-    r = requests.post(TELEGRAM_API, json=payload, timeout=10)
+    r = requests.post(
+        TELEGRAM_API.format(token=token),
+        json=payload,
+        timeout=10,
+    )
 
     if not r.ok:
-            def _send_chunk(text):
-        r = requests.post(...)
-        if r.status_code != 200:
-            print("Telegram error:", r.status_code, r.text)
-            return False
-        return True
+        raise RuntimeError(f"Telegram error {r.status_code}: {r.text}")
+
 
 # ==========================================================
 # PUBLIC SEND MESSAGE
@@ -42,8 +42,11 @@ def send_message(text: str):
     - NO silent fail
     """
 
-    print(">>> SEND_MESSAGE CALLED")
-    print(">>> TEXT LENGTH:", len(text))
+    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+
+    if not token or not chat_id:
+        raise RuntimeError("Telegram token / chat_id belum diset")
 
     if not text:
         raise ValueError("Telegram message is empty")
@@ -52,17 +55,17 @@ def send_message(text: str):
     # SHORT MESSAGE
     # ======================================================
     if len(text) <= SAFE_LIMIT:
-        _send_chunk(text)
+        _send_chunk(text, token, chat_id)
         return
 
     # ======================================================
     # LONG MESSAGE → SPLIT
     # ======================================================
     parts = [
-        text[i:i + SAFE_LIMIT]
+        text[i : i + SAFE_LIMIT]
         for i in range(0, len(text), SAFE_LIMIT)
     ]
 
     for idx, part in enumerate(parts, start=1):
         header = f"<b>📦 Part {idx}/{len(parts)}</b>\n\n"
-        _send_chunk(header + part)
+        _send_chunk(header + part, token, chat_id)
