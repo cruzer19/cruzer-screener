@@ -1,5 +1,9 @@
 from dataclasses import dataclass
 from typing import List
+from typing import Dict
+
+class StockResult:
+    score_breakdown: Dict[str, int]
 
 @dataclass
 class StockResult:
