@@ -36,13 +36,47 @@ def render_stock_analysis_message(
     # SUPPORT RESISTANCE
     # =====================
     lines.append("📉 <b>Support & Resistance</b>")
+
+    last_price = analysis["last_price"]
+    major = analysis.get("support")
+    minor = analysis.get("minor_support")
+    resistance = analysis.get("resistance")
+
+    supports = []
+
+    if major is not None:
+        supports.append(("Major", major))
+    if minor is not None:
+        supports.append(("Minor", minor))
+
+    # Tentukan Near / Far
+    if len(supports) == 2:
+        supports_sorted = sorted(
+            supports,
+            key=lambda x: abs(last_price - x[1])
+        )
+        near_label, near_val = supports_sorted[0]
+        far_label, far_val = supports_sorted[1]
+
+        lines.append(
+            f"Support (Near)  : Rp {int(near_val):,} ({near_label})".replace(",", ".")
+        )
+        lines.append(
+            f"Support (Far)   : Rp {int(far_val):,} ({far_label})".replace(",", ".")
+        )
+
+    elif len(supports) == 1:
+        label, val = supports[0]
+        lines.append(
+            f"Support ({label}) : Rp {val:,}".replace(",", ".")
+        )
+
+    # Resistance
     lines.append(
-        f"Support       : Rp {analysis['support']:,}".replace(",", ".")
-    )
-    lines.append(
-        f"Resistance  : Rp {analysis['resistance']:,}".replace(",", ".")
+        f"Resistance     : Rp {resistance:,}".replace(",", ".")
     )
     lines.append("")
+
 
     # =====================
     # ENTRY PLAN

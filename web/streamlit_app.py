@@ -20,6 +20,7 @@ load_dotenv()
 # ==========================================================
 import streamlit as st
 import pandas as pd
+import numpy as np
 
 from app.core.engine import ScreenerEngine
 from app.config.saham_list import SAHAM_LIST
@@ -93,6 +94,38 @@ def render_df(data):
     if "Score" in df.columns:
         df = df.style.applymap(score_color, subset=["Score"])
     st.dataframe(df, use_container_width=True)
+
+def calc_minor_support(df, lookback=12):
+    """
+    Minor support = lowest low dari N candle terakhir
+    Aman untuk:
+    - low / Low
+    - MultiIndex
+    - memastikan return SELALU float atau None
+    """
+    if df is None or df.empty:
+        return None
+
+    recent = df.tail(lookback)
+
+    # === CASE 1: kolom tunggal ===
+    for col in ["low", "Low", "LOW"]:
+        if col in recent.columns:
+            series = recent[col].dropna()
+            if series.empty:
+                return None
+            return float(series.min())
+
+    # === CASE 2: MultiIndex ===
+    if isinstance(recent.columns, pd.MultiIndex):
+        for col in recent.columns:
+            if str(col[-1]).lower() == "low":
+                series = recent[col].dropna()
+                if series.empty:
+                    return None
+                return float(series.min())
+
+    return None
 
 # ==========================================================
 # ======================= SCREENER =========================
@@ -380,9 +413,15 @@ def render_stock_analysis():
             result = analyze_single_stock(df)
             news_result = fetch_stock_news(kode)
 
+            # === tambahan untuk Support Minor (dipakai UI & Telegram) ===
+            minor_support = calc_minor_support(df)
+            result["minor_support"] = minor_support
+
+            # === simpan ke session_state ===
             st.session_state["analysis_result"] = result
             st.session_state["news_result"] = news_result
             st.session_state["analysis_timeframe"] = timeframe
+            st.session_state["analysis_df"] = df
 
     # ===================== DISPLAY =====================
     if "analysis_result" not in st.session_state:
@@ -405,31 +444,102 @@ def render_stock_analysis():
 
     # ---------- Support Resistance ----------
     st.subheader("📉 Support & Resistance")
-    sr_df = pd.DataFrame(
-        {
-            "Level": ["Support", "Resistance"],
-            "Price": [
-                f"Rp {int(result['support']):,}".replace(",", "."),
-                f"Rp {int(result['resistance']):,}".replace(",", "."),
-            ],
-        }
+
+    df_price = st.session_state.get("analysis_df")
+    minor_support = calc_minor_support(df_price)
+    major_support = result["support"]
+    last_price = result["last_price"]
+
+    supports = []
+
+    if major_support is not None:
+        supports.append(("Major", major_support))
+    if minor_support is not None:
+        supports.append(("Minor", minor_support))
+
+    rows = []
+
+    # ===== NEAR / FAR LOGIC (SAMA DENGAN TELEGRAM) =====
+    if len(supports) == 2:
+        supports_sorted = sorted(
+            supports,
+            key=lambda x: abs(last_price - x[1])
+        )
+
+        near_label, near_val = supports_sorted[0]
+        far_label, far_val = supports_sorted[1]
+
+        rows.extend([
+            (
+                "Support (Near)",
+                f"Rp {int(near_val):,} ({near_label})".replace(",", "."),
+            ),
+            (
+                "Support (Far)",
+                f"Rp {int(far_val):,} ({far_label})".replace(",", "."),
+            ),
+        ])
+
+    elif len(supports) == 1:
+        label, val = supports[0]
+        rows.append(
+            (
+                f"Support ({label})",
+                f"Rp {int(val):,}".replace(",", "."),
+            )
+        )
+
+    # ===== RESISTANCE =====
+    rows.append(
+        (
+            "Resistance",
+            f"Rp {int(result['resistance']):,}".replace(",", "."),
+        )
     )
+
+    sr_df = pd.DataFrame(rows, columns=["Level", "Price"])
     st.table(sr_df.set_index("Level"))
+
 
     # ---------- Entry ----------
     st.subheader("🎯 Entry Plan")
+
+    # ===== DEFAULT (WAJIB ADA) =====
     entry_low, entry_high = result["entry_zone"]
+    entry_label = "Entry Zone (Default)"
 
     entry_df = pd.DataFrame(
         {
-            "Parameter": ["Entry Zone", "Risk"],
+            "Parameter": [entry_label, "Risk"],
             "Value": [
                 f"Rp {int(entry_low):,} – Rp {int(entry_high):,}".replace(",", "."),
                 f"{result['risk_pct']} %",
             ],
         }
     )
+
+    # ===== SMART ENTRY (OPTIONAL OVERRIDE) =====
+    if minor_support is not None:
+        buffer_pct = 0.015  # 1.5%
+        smart_low = minor_support
+        smart_high = minor_support * (1 + buffer_pct)
+
+        last_price = result["last_price"]
+
+        if smart_low <= last_price <= smart_high * 1.05:
+            entry_df = pd.DataFrame(
+                {
+                    "Parameter": ["Entry Zone (Support Minor)", "Risk"],
+                    "Value": [
+                        f"Rp {int(smart_low):,} – Rp {int(smart_high):,}".replace(",", "."),
+                        f"{result['risk_pct']} %",
+                    ],
+                }
+            )
+
+    # ===== RENDER (AMAN) =====
     st.table(entry_df.set_index("Parameter"))
+
 
         # ---------- News ----------
     st.subheader("📰 News & Sentiment")
@@ -620,7 +730,7 @@ def render_trading_tracker():
         st.info("Belum ada trade.")
     else:
         for idx, row in df_view.iterrows():
-            col1, col2, col3 = st.columns([6, 1, 1])
+            col_left, col_right = st.columns([8, 2])
 
             sell_info = (
                 f"Sell Date: {row['Sell Date']}"
@@ -628,37 +738,43 @@ def render_trading_tracker():
                 else "Sell Date: -"
             )
 
-            with col1:
+            # ===== LEFT: INFO =====
+            with col_left:
                 st.markdown(
                     f"""
-                    **{row['Kode']}**  \
-                    Buy Date: {row['buy_date']} (**{row['Holding Days']} hari**) <br>
-                    {sell_info}  \
-                    Buy: {row['Buy']} | Now: {row['Now']}  \
-                    Sisa Lot: {row['Sisa Lot']}  \
-                    Status: **{row['Status']}**  \
+                    **{row['Kode']}**  
+                    Buy Date: {row['buy_date']} (**{row['Holding Days']} hari**)  
+                    {sell_info}  
+                    Buy: {row['Buy']} | Now: {row['Now']}  
+                    Sisa Lot: {row['Sisa Lot']}  
+                    Status: **{row['Status']}**  
                     P/L: Rp {row['PnL (Rp)']:,} ({row['PnL (%)']}%)
                     """,
                     unsafe_allow_html=True,
                 )
 
-            with col3:
-                if st.button("🗑️", key=f"del_{idx}"):
+            # ===== RIGHT: ACTION =====
+            with col_right:
+                if st.button("🗑️ Hapus", key=f"del_{idx}", use_container_width=True):
                     st.session_state["delete_target"] = idx
 
-                    if "delete_target" in st.session_state:
-                        st.warning("⚠️ Yakin mau hapus trade ini?")
-                        c1, c2 = st.columns(2)
+                if st.session_state.get("delete_target") == idx:
+                    st.warning("⚠️ Yakin hapus trade ini?")
+                    if st.button("❌ Batal", key=f"cancel_{idx}", use_container_width=True):
+                        st.session_state.pop("delete_target")
 
-                        with c1:
-                            if st.button("❌ Batal"):
-                                st.session_state.pop("delete_target")
+                    if st.button(
+                        "✅ Hapus Permanen",
+                        key=f"confirm_{idx}",
+                        type="primary",
+                        use_container_width=True,
+                    ):
+                        delete_trade(idx)
+                        st.session_state.pop("delete_target")
+                        st.rerun()
 
-                        with c2:
-                            if st.button("✅ Hapus Permanen"):
-                                delete_trade(st.session_state["delete_target"])
-                                st.session_state.pop("delete_target")
-                                st.rerun()
+            st.divider()
+
 
 # ==========================================================
 # ======================= ROUTER ===========================
@@ -676,4 +792,4 @@ else:
 # FOOTER
 # ==========================================================
 st.markdown("---")
-st.caption("© Cruzer AI • Stock Screener Engine")
+st.caption("© 2026 Cruzer AI • Stock Screener Engine. All rights reserved.")
