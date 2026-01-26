@@ -26,7 +26,7 @@ def render_stock_analysis_message(
     # MARKET CONDITION
     # =====================
     lines.append("🧭 <b>Market Condition</b>")
-    lines.append(f"Trend  : <b>{analysis['trend']}</b>")
+    lines.append(f"Trend   : <b>{analysis['trend']}</b>")
     lines.append(
         f"Harga  : Rp {analysis['last_price']:,}".replace(",", ".")
     )
@@ -62,7 +62,7 @@ def render_stock_analysis_message(
             f"Support (Near)  : Rp {int(near_val):,} ({near_label})".replace(",", ".")
         )
         lines.append(
-            f"Support (Far)   : Rp {int(far_val):,} ({far_label})".replace(",", ".")
+            f"Support (Far)     : Rp {int(far_val):,} ({far_label})".replace(",", ".")
         )
 
     elif len(supports) == 1:
@@ -73,7 +73,7 @@ def render_stock_analysis_message(
 
     # Resistance
     lines.append(
-        f"Resistance     : Rp {resistance:,}".replace(",", ".")
+        f"Resistance         : Rp {resistance:,}".replace(",", ".")
     )
     lines.append("")
 
@@ -84,9 +84,9 @@ def render_stock_analysis_message(
     entry_low, entry_high = analysis["entry_zone"]
     lines.append("🎯 <b>Entry Plan</b>")
     lines.append(
-        f"Entry Zone : Rp {entry_low:,} – Rp {entry_high:,}".replace(",", ".")
+        f"Entry Zone   : Rp {entry_low:,} – Rp {entry_high:,}".replace(",", ".")
     )
-    lines.append(f"Risk             : {analysis['risk_pct']}%")
+    lines.append(f"Risk              : {analysis['risk_pct']}%")
     lines.append("")
 
     # =====================

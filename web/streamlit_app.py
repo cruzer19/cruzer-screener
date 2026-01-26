@@ -318,18 +318,58 @@ def render_screener():
         render_df(df_entry)
 
     # ===== BUTTON TELEGRAM (SETELAH TABEL) =====
+    st.subheader("📤 Share CAN ENTRY")
+
+    # ambil password (secrets → env fallback)
+    def get_share_password():
+        try:
+            return st.secrets.get("SHARE_PASSWORD")
+        except Exception:
+            return os.getenv("SHARE_PASSWORD")
+
+    SHARE_PASSWORD = get_share_password()
+
+    input_pwd = st.text_input(
+        "🔐 Password untuk kirim CAN ENTRY",
+        type="password",
+        key="share_pwd_can_entry",
+    )
+
+    is_authorized = input_pwd == SHARE_PASSWORD
+
     if st.button(
         "📩 Send CAN ENTRY to Telegram",
         type="primary",
         use_container_width=True,
         key="btn_send_can_entry_telegram",
+        disabled=not is_authorized,
     ):
-        if not os.getenv("TELEGRAM_BOT_TOKEN") or not os.getenv("TELEGRAM_CHAT_ID"):
-            st.error("Telegram belum dikonfigurasi (Secrets belum ada)")
+        bot_token = (
+            st.secrets.get("TELEGRAM_BOT_TOKEN", None)
+            if hasattr(st, "secrets")
+            else None
+        ) or os.getenv("TELEGRAM_BOT_TOKEN")
+
+        chat_id = (
+            st.secrets.get("TELEGRAM_CHAT_ID", None)
+            if hasattr(st, "secrets")
+            else None
+        ) or os.getenv("TELEGRAM_CHAT_ID")
+
+        if not bot_token or not chat_id:
+            st.error("Telegram belum dikonfigurasi (Secrets / ENV belum ada)")
         else:
-            message = render_telegram(results=entry_now)
-            send_message(message)
-            st.success("CAN ENTRY terkirim ke Telegram ✅")
+            try:
+                message = render_telegram(results=entry_now)
+                send_message(message)
+                st.success("CAN ENTRY terkirim ke Telegram ✅")
+            except Exception as e:
+                st.error("❌ Gagal kirim ke Telegram")
+                st.code(str(e))
+
+    if input_pwd and not is_authorized:
+        st.error("❌ Password salah")
+
 
     # ================= RENDER WATCHLIST =================
     st.subheader("🟡 WATCHLIST")
@@ -582,10 +622,24 @@ def render_stock_analysis():
         st.info("➡️ " + insight_text)
 
     # ===================== SEND TELEGRAM =====================
-    st.divider()
     st.subheader("📤 Share Analysis")
 
-    if st.button("📨 Send to Telegram"):
+    SHARE_PASSWORD = st.secrets.get("SHARE_PASSWORD")
+
+    input_pwd = st.text_input(
+        "🔐 Password untuk kirim Telegram",
+        type="password",
+        key="share_pwd",
+    )
+
+    is_authorized = input_pwd == SHARE_PASSWORD
+
+    if st.button(
+        "📨 Send to Telegram",
+        type="primary",
+        use_container_width=True,
+        disabled=not is_authorized,
+    ):
         try:
             msg = render_stock_analysis_message(
                 kode=st.session_state["analysis_kode"],
@@ -599,6 +653,9 @@ def render_stock_analysis():
         except Exception as e:
             st.error("❌ Gagal kirim ke Telegram")
             st.code(str(e))
+
+    if input_pwd and not is_authorized:
+        st.error("❌ Password salah")
 
 # ==========================================================
 # =================== TRADING TRACKER ======================
