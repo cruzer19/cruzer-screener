@@ -139,8 +139,13 @@ def render_telegram(
         ])
 
     # ===== FOOTER =====
-    lines.append("⚠️ Gunakan money management & disiplin SL")
-    lines.append("🤖 Auto Screener System")
+    lines.append("⚠️ Trading Notes:")
+    lines.append("• Semua setup masih berada di fase konsolidasi, belum entry agresif.")
+    lines.append("• Prioritaskan entry saat harga mendekati area dengan konfirmasi volume.")
+    lines.append("• Jangan FOMO, lebih baik ketinggalan peluang daripada salah entry.")
+    lines.append("• Risk terkontrol > profit besar.")
+    lines.append("")
+    lines.append("🤖 Cruzer AI — Auto Screener System")
 
     return "\n".join(lines)
 
