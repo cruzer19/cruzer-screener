@@ -233,9 +233,12 @@ def render_screener():
 
     # ================= SCAN =================
     if st.button("🔍 Scan Market", use_container_width=True):
-        engine = ScreenerEngine()
-        st.session_state["results"] = engine.run(SAHAM_LIST, screener_type)
-        st.session_state.scanned_screener = screener_type
+        with st.spinner("🔍 Scanning market... Mohon tunggu"):
+            engine = ScreenerEngine()
+            st.session_state["results"] = engine.run(SAHAM_LIST, screener_type)
+            st.session_state.scanned_screener = screener_type
+
+        st.success("✅ Scan market selesai")
 
     # ================= DISPLAY =================
     if not (
@@ -308,7 +311,10 @@ def render_screener():
     df_entry = pd.DataFrame(entry_now)
 
     if df_entry.empty:
-        st.info("Belum ada CAN ENTRY")
+        st.info(
+            "📭 Belum ada saham yang memenuhi kriteria **CAN ENTRY**.\n\n"
+            "📌 Tunggu konfirmasi harga / volume, atau sesuaikan parameter screener."
+        )
     else:
         df_entry = (
             df_entry.sort_values(by=["Score", "Harga"], ascending=[False, False])
@@ -335,7 +341,10 @@ def render_screener():
         key="share_pwd_can_entry",
     )
 
-    is_authorized = input_pwd == SHARE_PASSWORD
+    # cek apakah ada CAN ENTRY
+    has_entry = len(entry_now) > 0
+
+    is_authorized = input_pwd == SHARE_PASSWORD and has_entry
 
     if st.button(
         "📩 Send CAN ENTRY to Telegram",
@@ -367,7 +376,11 @@ def render_screener():
                 st.error("❌ Gagal kirim ke Telegram")
                 st.code(str(e))
 
-    if input_pwd and not is_authorized:
+
+    if not has_entry:
+        st.info("📭 Tidak ada CAN ENTRY untuk dikirim ke Telegram.")
+
+    elif input_pwd and input_pwd != SHARE_PASSWORD:
         st.error("❌ Password salah")
 
 
@@ -376,7 +389,12 @@ def render_screener():
 
     df_watchlist = pd.DataFrame(watchlist)
 
-    if not df_watchlist.empty:
+    if df_watchlist.empty:
+        st.info(
+            "📭 Tidak ada saham yang masuk **WATCHLIST** saat ini.\n\n"
+            "ℹ️ Biasanya terjadi saat market sepi atau filter cukup ketat."
+        )
+    else:
         df_watchlist = (
             df_watchlist.sort_values(by=["Score", "Harga"], ascending=[False, False])
             .reset_index(drop=True)
