@@ -31,11 +31,20 @@ SAHAM_SECTOR = {
     "INDY": "MINING",
     "DOID": "MINING",
     "BUMI": "MINING",
+    "MBAP": "MINING",
+    "BSSR": "MINING",
+    "GEMS": "MINING",
+
     "ELSA": "ENERGY",
     "MEDC": "ENERGY",
     "AKRA": "ENERGY",
     "RAJA": "ENERGY",
     "BRPT": "ENERGY",
+    "PTRO": "ENERGY",
+    "TOBA": "ENERGY",
+    "RATU": "ENERGY",
+    "WOWS": "ENERGY",
+    "HELI": "ENERGY",
 
     # ===== CONSUMER & RETAIL =====
     "UNVR": "CONSUMER",
@@ -45,6 +54,9 @@ SAHAM_SECTOR = {
     "KLBF": "CONSUMER",
     "ULTJ": "CONSUMER",
     "CLEO": "CONSUMER",
+    "KINO": "CONSUMER",
+    "ZATA": "CONSUMER",
+
     "AMRT": "RETAIL",
     "RALS": "RETAIL",
     "ACES": "RETAIL",
@@ -52,7 +64,7 @@ SAHAM_SECTOR = {
     "MAPI": "RETAIL",
     "MAPA": "RETAIL",
     "MPPA": "RETAIL",
-    "KINO": "CONSUMER",
+    "FAST": "RETAIL",
 
     # ===== PROPERTY =====
     "CTRA": "PROPERTY",
@@ -69,12 +81,19 @@ SAHAM_SECTOR = {
     "CITY": "PROPERTY",
     "GPRA": "PROPERTY",
     "EMDE": "PROPERTY",
+    "PLAN": "PROPERTY",
 
     # ===== INFRA / TRANSPORT =====
     "JSMR": "INFRA",
+    "IBST": "INFRA",
+    "CSIS": "INFRA",
+
     "ASSA": "TRANSPORT",
     "WEHA": "TRANSPORT",
     "LEAD": "TRANSPORT",
+    "BIRD": "TRANSPORT",
+    "PSSI": "TRANSPORT",
+    "JARR": "TRANSPORT",
 
     # ===== TECH / DIGITAL =====
     "GOTO": "TECH",
@@ -84,15 +103,27 @@ SAHAM_SECTOR = {
     "WIFI": "TECH",
     "EDGE": "TECH",
     "ENVY": "TECH",
+    "COIN": "TECH",
+    "DIVA": "TECH",
+    "MORA": "TECH",
 
-    # ===== MANUFACTURING / AUTO =====
+    # ===== MANUFACTURING / INDUSTRIAL =====
     "ASII": "MANUFACTURING",
-    "AUTO": "AUTO",
-    "IMAS": "AUTO",
     "GJTL": "MANUFACTURING",
     "POLY": "MANUFACTURING",
     "SMGR": "MANUFACTURING",
     "INTP": "MANUFACTURING",
+    "IKBI": "MANUFACTURING",
+    "KRYA": "MANUFACTURING",
+
+    # ===== AUTO =====
+    "AUTO": "AUTO",
+    "IMAS": "AUTO",
+
+    # ===== HOLDING / INDUSTRIAL =====
+    "TPIA": "INDUSTRIAL",
+    "CUAN": "HOLDING",
+    "CDIA": "HOLDING",
 
     # ===== OTHERS / SPECULATIVE =====
     "SUPA": "SPECULATIVE",
@@ -102,9 +133,6 @@ SAHAM_SECTOR = {
     "PANI": "SPECULATIVE",
     "SOCI": "SPECULATIVE",
     "COCO": "SPECULATIVE",
-    "BIRD": "TRANSPORT",
     "BUAH": "SPECULATIVE",
-    "KRYA": "SPECULATIVE",
-    "IBST": "INFRA",
-    "ZATA": "CONSUMER",
+    "MARK": "SPECULATIVE",
 }

@@ -39,6 +39,11 @@ SAHAM_PROFILE = {
     "DOID": "Delta Dunia Makmur Tbk",
     "ELSA": "Elnusa Tbk",
     "RAJA": "Rukun Raharja Tbk",
+    "PTRO": "Petrosea Tbk",
+    "MBAP": "Mitrabara Adiperdana Tbk",
+    "BSSR": "Baramulti Suksessarana Tbk",
+    "GEMS": "Golden Energy Mines Tbk",
+    "TOBA": "TBS Energi Utama Tbk",
 
     # ===== CONSUMER & RETAIL =====
     "ERAA": "Erajaya Swasembada Tbk",
@@ -50,8 +55,8 @@ SAHAM_PROFILE = {
     "MPPA": "Matahari Putra Prima Tbk",
     "CLEO": "Sariguna Primatirta Tbk",
     "ULTJ": "Ultrajaya Milk Industry & Trading Company Tbk",
-    "WINGS": "Wings Group Indonesia",  # non-listing legacy brand
     "KINO": "Kino Indonesia Tbk",
+    "FAST": "Fast Food Indonesia Tbk",
 
     # ===== PROPERTY =====
     "CTRA": "Ciputra Development Tbk",
@@ -76,6 +81,10 @@ SAHAM_PROFILE = {
     "MTEL": "Dayamitra Telekomunikasi Tbk",
     "ASSA": "Adi Sarana Armada Tbk",
     "WEHA": "WEHA Transportasi Indonesia Tbk",
+    "JARR": "Jhonlin Agro Raya Tbk",
+    "CSIS": "Cahayasakti Investindo Sukses Tbk",
+    "IKBI": "Sumi Indo Kabel Tbk",
+    "PSSI": "Pelita Samudera Shipping Tbk",
 
     # ===== TECH / DIGITAL =====
     "GOTO": "GoTo Gojek Tokopedia Tbk",
@@ -85,8 +94,21 @@ SAHAM_PROFILE = {
     "WIFI": "Solusi Sinergi Digital Tbk",
     "EDGE": "Indointernet Tbk",
     "ENVY": "Envy Technologies Indonesia Tbk",
+    "COIN": "Indo Digital Nusantara Tbk",
+    "DIVA": "Distribusi Voucher Nusantara Tbk",
+    "MORA": "Mora Telematika Indonesia Tbk",
+
+    # ===== CHEMICAL / INDUSTRIAL / HOLDING =====
+    "TPIA": "Chandra Asri Pacific Tbk",
+    "CUAN": "Petrindo Jaya Kreasi Tbk",
+    "CDIA": "Chandra Daya Investasi Tbk",
+    "PLAN": "Plaza Indonesia Realty Tbk",
 
     # ===== SMALL CAP / MOMENTUM / SPECULATIVE =====
+    "RATU": "Ratu Prabu Energi Tbk",
+    "WOWS": "Ginting Jaya Energi Tbk",
+    "HELI": "Heli Surya Internusa Tbk",
+    "MARK": "Mark Dynamics Indonesia Tbk",
     "SUPA": "Surya Pertiwi Tbk",
     "REAL": "Repower Asia Indonesia Tbk",
     "BKDP": "Bukit Darmo Property Tbk",
