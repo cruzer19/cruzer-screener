@@ -11,13 +11,18 @@ SAHAM_SECTOR = {
     "BNGA": "BANK",
     "BBTN": "BANK",
     "NISP": "BANK",
-    "TRIM": "FINANCE",
+    "INPC": "BANK",
 
-    # ===== TELECOM =====
+    "TRIM": "FINANCE",
+    "AKSI": "FINANCE",
+
+    # ===== TELECOM / TOWER =====
     "TLKM": "TELECOM",
     "EXCL": "TELECOM",
     "ISAT": "TELECOM",
     "FREN": "TELECOM",
+    "IBST": "TELECOM",
+
     "MTEL": "INFRA",
 
     # ===== ENERGY & MINING =====
@@ -34,6 +39,14 @@ SAHAM_SECTOR = {
     "MBAP": "MINING",
     "BSSR": "MINING",
     "GEMS": "MINING",
+    "ARCI": "MINING",
+    "NICL": "MINING",
+    "NCKL": "MINING",
+    "PSAB": "MINING",
+    "SMRU": "MINING",
+    "ABMM": "MINING",
+    "KKGI": "MINING",
+    "POLU": "MINING",
 
     "ELSA": "ENERGY",
     "MEDC": "ENERGY",
@@ -45,8 +58,11 @@ SAHAM_SECTOR = {
     "RATU": "ENERGY",
     "WOWS": "ENERGY",
     "HELI": "ENERGY",
+    "BREN": "ENERGY",
+    "SUGI": "ENERGY",
+    "GOLD": "ENERGY",
 
-    # ===== CONSUMER & RETAIL =====
+    # ===== CONSUMER =====
     "UNVR": "CONSUMER",
     "ICBP": "CONSUMER",
     "INDF": "CONSUMER",
@@ -56,7 +72,12 @@ SAHAM_SECTOR = {
     "CLEO": "CONSUMER",
     "KINO": "CONSUMER",
     "ZATA": "CONSUMER",
+    "COCO": "CONSUMER",
+    "BUAH": "CONSUMER",
+    "SIMA": "CONSUMER",
+    "CINT": "CONSUMER",
 
+    # ===== RETAIL =====
     "AMRT": "RETAIL",
     "RALS": "RETAIL",
     "ACES": "RETAIL",
@@ -65,6 +86,10 @@ SAHAM_SECTOR = {
     "MAPA": "RETAIL",
     "MPPA": "RETAIL",
     "FAST": "RETAIL",
+    "DEPO": "RETAIL",
+
+    # ===== AGRI =====
+    "SMAR": "AGRI",
 
     # ===== PROPERTY =====
     "CTRA": "PROPERTY",
@@ -82,18 +107,34 @@ SAHAM_SECTOR = {
     "GPRA": "PROPERTY",
     "EMDE": "PROPERTY",
     "PLAN": "PROPERTY",
+    "MMLP": "PROPERTY",
+    "MTSM": "PROPERTY",
+    "MPRO": "PROPERTY",
+    "PURI": "PROPERTY",
+    "GAMA": "PROPERTY",
+    "REAL": "PROPERTY",
+    "BKDP": "PROPERTY",
 
-    # ===== INFRA / TRANSPORT =====
+    # ===== INFRA =====
     "JSMR": "INFRA",
-    "IBST": "INFRA",
     "CSIS": "INFRA",
+    "KBLV": "INFRA",
+    "FWCT": "INFRA",
+    "VKTR": "INFRA",
+    "OPMS": "INFRA",
 
+    # ===== TRANSPORT / LOGISTIC =====
     "ASSA": "TRANSPORT",
     "WEHA": "TRANSPORT",
     "LEAD": "TRANSPORT",
     "BIRD": "TRANSPORT",
     "PSSI": "TRANSPORT",
     "JARR": "TRANSPORT",
+    "RMKE": "TRANSPORT",
+    "HITS": "TRANSPORT",
+    "MEJA": "TRANSPORT",
+    "LAJU": "TRANSPORT",
+    "GTSI": "TRANSPORT",
 
     # ===== TECH / DIGITAL =====
     "GOTO": "TECH",
@@ -106,6 +147,13 @@ SAHAM_SECTOR = {
     "COIN": "TECH",
     "DIVA": "TECH",
     "MORA": "TECH",
+    "MMIX": "TECH",
+    "DGNS": "TECH",
+    "TFAS": "TECH",
+    "SOTS": "TECH",
+    "NETV": "TECH",
+    "YELO": "TECH",
+    "UANG": "TECH",
 
     # ===== MANUFACTURING / INDUSTRIAL =====
     "ASII": "MANUFACTURING",
@@ -115,24 +163,42 @@ SAHAM_SECTOR = {
     "INTP": "MANUFACTURING",
     "IKBI": "MANUFACTURING",
     "KRYA": "MANUFACTURING",
+    "ALKA": "MANUFACTURING",
+    "INAI": "MANUFACTURING",
+    "LMPI": "MANUFACTURING",
+    "PACK": "MANUFACTURING",
+    "TRJA": "MANUFACTURING",
 
     # ===== AUTO =====
     "AUTO": "AUTO",
     "IMAS": "AUTO",
 
-    # ===== HOLDING / INDUSTRIAL =====
+    # ===== HOLDING / INVESTMENT =====
     "TPIA": "INDUSTRIAL",
     "CUAN": "HOLDING",
     "CDIA": "HOLDING",
+    "ALII": "HOLDING",
+    "MTRA": "HOLDING",
+
+    # ===== HEALTH =====
+    "CARE": "HEALTH",
+
+    # ===== MEDIA =====
+    "STAR": "MEDIA",
 
     # ===== OTHERS / SPECULATIVE =====
     "SUPA": "SPECULATIVE",
-    "REAL": "SPECULATIVE",
-    "BKDP": "SPECULATIVE",
     "RLCO": "SPECULATIVE",
     "PANI": "SPECULATIVE",
     "SOCI": "SPECULATIVE",
-    "COCO": "SPECULATIVE",
-    "BUAH": "SPECULATIVE",
     "MARK": "SPECULATIVE",
+    "AGII": "SPECULATIVE",
+    "TAYS": "SPECULATIVE",
+    "PSKT": "SPECULATIVE",
+    "TOOL": "SPECULATIVE",
+    "NUSA": "SPECULATIVE",
+    "SMMT": "SPECULATIVE",
+    "CBMF": "SPECULATIVE",
+    "ESTA": "SPECULATIVE",
+    "CASH": "SPECULATIVE",
 }
