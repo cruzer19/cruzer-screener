@@ -1,6 +1,8 @@
 SAHAM_PROFILE = {
 
-    # ===== BIG CAP / BLUECHIP =====
+    # ==============================
+    # BIG CAP / BLUECHIP
+    # ==============================
     "BBCA": "Bank Central Asia Tbk",
     "BBRI": "Bank Rakyat Indonesia Tbk",
     "BMRI": "Bank Mandiri Tbk",
@@ -16,16 +18,28 @@ SAHAM_PROFILE = {
     "SMGR": "Semen Indonesia Tbk",
     "INTP": "Indocement Tunggal Prakarsa Tbk",
 
-    # ===== BANK & FINANCE =====
+    # ==============================
+    # BANK & FINANCE
+    # ==============================
     "ARTO": "Bank Jago Tbk",
     "BRIS": "Bank Syariah Indonesia Tbk",
     "BTPS": "Bank BTPN Syariah Tbk",
     "BNGA": "Bank CIMB Niaga Tbk",
     "BBTN": "Bank Tabungan Negara Tbk",
     "NISP": "Bank OCBC NISP Tbk",
+    "BJBR": "Bank Pembangunan Daerah Jawa Barat dan Banten Tbk",
+    "BJTM": "Bank Pembangunan Daerah Jawa Timur Tbk",
+    "MEGA": "Bank Mega Tbk",
+    "PNBN": "Bank Pan Indonesia Tbk",
+    "BNLI": "Bank Permata Tbk",
+    "AGRO": "Bank Raya Indonesia Tbk",
+    "INPC": "Bank Artha Graha Internasional Tbk",
 
-    # ===== ENERGY & MINING =====
+    # ==============================
+    # ENERGY & MINING
+    # ==============================
     "ADRO": "Adaro Energy Indonesia Tbk",
+    "ADMR": "Adaro Minerals Indonesia Tbk",
     "ITMG": "Indo Tambangraya Megah Tbk",
     "PTBA": "Bukit Asam Tbk",
     "MEDC": "Medco Energi Internasional Tbk",
@@ -51,11 +65,16 @@ SAHAM_PROFILE = {
     "PSAB": "J Resources Asia Pasifik Tbk",
     "SMRU": "SMR Utama Tbk",
     "ABMM": "ABM Investama Tbk",
-    "CINT": "Chitose Internasional Tbk",
-    "GOLD": "Visi Telekomunikasi Infrastruktur Tbk",
+    "DEWA": "Darma Henwa Tbk",
+    "BYAN": "Bayan Resources Tbk",
+    "ESSA": "ESSA Industries Indonesia Tbk",
+    "PGEO": "Pertamina Geothermal Energy Tbk",
+    "KEEN": "Kencana Energi Lestari Tbk",
     "KKGI": "Resource Alam Indonesia Tbk",
 
-    # ===== CONSUMER & RETAIL =====
+    # ==============================
+    # CONSUMER & RETAIL
+    # ==============================
     "ERAA": "Erajaya Swasembada Tbk",
     "ACES": "Ace Hardware Indonesia Tbk",
     "MAPI": "Mitra Adiperkasa Tbk",
@@ -67,13 +86,17 @@ SAHAM_PROFILE = {
     "ULTJ": "Ultrajaya Milk Industry & Trading Company Tbk",
     "KINO": "Kino Indonesia Tbk",
     "FAST": "Fast Food Indonesia Tbk",
+    "LPPF": "Matahari Department Store Tbk",
     "SMAR": "Sinar Mas Agro Resources and Technology Tbk",
-    "ALII": "Ancora Indonesia Resources Tbk",
-    "DEPO": "Caturkarda Depo Bangunan Tbk",
-    "CARE": "Metro Healthcare Indonesia Tbk",
-    "DOSS": "Dosni Roha Indonesia Tbk",
+    "SIDO": "Industri Jamu dan Farmasi Sido Muncul Tbk",
+    "ROTI": "Nippon Indosari Corpindo Tbk",
+    "GOOD": "Garudafood Putra Putri Jaya Tbk",
+    "HOKI": "Buyung Poetra Sembada Tbk",
+    "CAMP": "Campina Ice Cream Industry Tbk",
 
-    # ===== PROPERTY =====
+    # ==============================
+    # PROPERTY
+    # ==============================
     "CTRA": "Ciputra Development Tbk",
     "BSDE": "Bumi Serpong Damai Tbk",
     "PWON": "Pakuwon Jati Tbk",
@@ -89,7 +112,9 @@ SAHAM_PROFILE = {
     "DILD": "Intiland Development Tbk",
     "LPKR": "Lippo Karawaci Tbk",
 
-    # ===== INFRA / TRANSPORT =====
+    # ==============================
+    # INFRA / LOGISTIC / TRANSPORT
+    # ==============================
     "JSMR": "Jasa Marga Tbk",
     "EXCL": "XL Axiata Tbk",
     "ISAT": "Indosat Ooredoo Hutchison Tbk",
@@ -105,8 +130,18 @@ SAHAM_PROFILE = {
     "FWCT": "Wijaya Karya Beton Tbk",
     "RMKE": "RMK Energy Tbk",
     "MMLP": "Mega Manunggal Property Tbk",
+    "WIKA": "Wijaya Karya (Persero) Tbk",
+    "WSKT": "Waskita Karya (Persero) Tbk",
+    "PTPP": "PP (Persero) Tbk",
+    "ADHI": "Adhi Karya (Persero) Tbk",
+    "WEGE": "Wijaya Karya Bangunan Gedung Tbk",
+    "SMDR": "Samudera Indonesia Tbk",
+    "TMAS": "Temas Tbk",
+    "IPCM": "Jasa Armada Indonesia Tbk",
 
-    # ===== TECH / DIGITAL =====
+    # ==============================
+    # TECH / DIGITAL
+    # ==============================
     "GOTO": "GoTo Gojek Tokopedia Tbk",
     "BUKA": "Bukalapak.com Tbk",
     "DCII": "DCI Indonesia Tbk",
@@ -123,8 +158,14 @@ SAHAM_PROFILE = {
     "DGNS": "Diagnos Laboratorium Utama Tbk",
     "TFAS": "Telefast Indonesia Tbk",
     "SOTS": "Satria Antaran Prima Tbk",
+    "BELI": "Global Digital Niaga Tbk",
+    "MTDL": "Metrodata Electronics Tbk",
+    "DNET": "Indoritel Makmur Internasional Tbk",
+    "MLPT": "Multipolar Tbk",
 
-    # ===== CHEMICAL / INDUSTRIAL / HOLDING =====
+    # ==============================
+    # INDUSTRIAL / HOLDING
+    # ==============================
     "TPIA": "Chandra Asri Pacific Tbk",
     "CUAN": "Petrindo Jaya Kreasi Tbk",
     "CDIA": "Chandra Daya Investasi Tbk",
@@ -138,8 +179,17 @@ SAHAM_PROFILE = {
     "OPMS": "Optima Prima Metal Sinergi Tbk",
     "MTRA": "Mitra Investindo Tbk",
     "TRJA": "Transkon Jaya Tbk",
+    "UNTR": "United Tractors Tbk",
+    "SMSM": "Selamat Sempurna Tbk",
+    "SRTG": "Saratoga Investama Sedaya Tbk",
+    "AALI": "Astra Agro Lestari Tbk",
+    "LSIP": "PP London Sumatra Indonesia Tbk",
+    "AUTO": "Astra Otoparts Tbk",
+    "IMAS": "Indomobil Sukses Internasional Tbk",
 
-    # ===== SMALL CAP / MOMENTUM / GORENGAN =====
+    # ==============================
+    # SMALL CAP / MOMENTUM
+    # ==============================
     "LAJU": "Jasa Berdikari Logistics Tbk",
     "STAR": "Star Pacific Tbk",
     "BOGA": "Boga Dimsum Indonesia Tbk",
@@ -159,7 +209,6 @@ SAHAM_PROFILE = {
     "SUGI": "Sugih Energy Tbk",
     "UFOE": "Damai Sejahtera Abadi Tbk",
     "SMMT": "Golden Flower Tbk",
-    "INPC": "Bank Artha Graha Internasional Tbk",
     "POLU": "Golden Eagle Energy Tbk",
     "MTSM": "Metro Realty Tbk",
     "CBMF": "Cahaya Bintang Medan Tbk",

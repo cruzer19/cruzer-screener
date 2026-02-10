@@ -6,6 +6,7 @@ SAHAM_LIST = [
 
     # ===== BANK & FINANCE =====
     "ARTO","BRIS","BTPS","BNGA","BBTN","NISP",
+    "BJBR","BJTM","MEGA","PNBN","BNLI","AGRO",
 
     # ===== ENERGY & MINING =====
     "ADRO","ITMG","PTBA","MEDC","AKRA",
@@ -14,12 +15,14 @@ SAHAM_LIST = [
     "MBAP","BSSR","GEMS","TOBA","ARCI",
     "BREN","NICL","NCKL","PSAB","SMRU",
     "ABMM","CINT","GOLD","KKGI",
+    "ADMR","DEWA","BYAN","ESSA","PGEO","KEEN",
 
     # ===== CONSUMER & RETAIL =====
     "ERAA","ACES","MAPI","RALS","AMRT",
     "MAPA","MPPA","CLEO","ULTJ",
-    "WINGS","KINO","FAST",
+    "WINGS","KINO","FAST","LPPF",
     "SMAR","ALII","DEPO","CARE","DOSS",
+    "SIDO","ROTI","GOOD","HOKI","CAMP",
 
     # ===== PROPERTY (BIG → SMALL) =====
     "CTRA","BSDE","PWON","ASRI","SMRA",
@@ -31,23 +34,27 @@ SAHAM_LIST = [
     "ASSA","WEHA","JARR",
     "CSIS","IKBI","PSSI","VKTR",
     "KBLV","FWCT","RMKE","MMLP",
+    "WIKA","WSKT","PTPP","ADHI","WEGE",
+    "SMDR","TMAS","IPCM",
 
     # ===== TECH / DIGITAL =====
     "GOTO","BUKA","DCII","MCAS","WIFI",
     "EDGE","ENVY","COIN",
     "DIVA","MORA","UANG","AKSI",
     "MMIX","DGNS","TFAS","SOTS",
+    "BELI","MTDL","DNET","MLPT",
 
     # ===== CHEMICAL / INDUSTRIAL / HOLDING =====
     "TPIA","CUAN","CDIA","PLAN",
     "ALKA","INAI","LMPI","GTSI","BESS",
     "PACK","OPMS","MTRA","TRJA",
+    "UNTR","SMSM","SRTG","AALI","LSIP","AUTO","IMAS",
 
     # ===== SMALL CAP / MOMENTUM / SPECULATIVE =====
     "RATU","WOWS","HELI","MARK",
     "SUPA","REAL","BKDP","RLCO","POLY",
     "PANI","SOCI","COCO","BIRD","BUAH",
-    "KRYA","GJTL","AUTO","IMAS","BUMI",
+    "KRYA","GJTL","BUMI",
     "TRIM","ZATA","FREN","IBST","LEAD",
 
     # ===== TOP GAINER / GORENGAN AKTIF =====

@@ -24,6 +24,7 @@ import numpy as np
 
 from app.core.engine import ScreenerEngine
 from app.config.saham_list import SAHAM_LIST
+from app.config.dividend_list import DIVIDEND_LIST
 from app.renderers.telegram import render_telegram
 from app.services.telegram_bot import send_message
 from app.utils.news_engine import fetch_stock_news
@@ -37,6 +38,7 @@ from app.tracker.tracker import (
 )
 
 from app.renderers.telegram_stock_analysis import render_stock_analysis_message
+from app.core.dividend_engine import DividendEngine
 
 # ==========================================================
 # PAGE CONFIG
@@ -126,6 +128,307 @@ def calc_minor_support(df, lookback=12):
                 return float(series.min())
 
     return None
+
+# =============================
+# CACHE (biar scan gak berat)
+# =============================
+
+@st.cache_data(ttl=3600)
+def load_dividend_data(symbols):
+    return DividendEngine.scan(symbols)
+
+
+def render_dividend_screener():
+    st.title("💰 Dividend Screener")
+    st.caption("Daftar saham dividen dipisah per sektor")
+
+    symbols = [s + ".JK" for s in DIVIDEND_LIST]
+
+    with st.spinner("Loading dividend database..."):
+        df = load_dividend_data(symbols)
+
+    if df.empty:
+        st.warning("Tidak ada data ditemukan")
+        return
+
+    # =============================
+    # FIX PAYOUT %
+    # =============================
+    def normalize_payout(x):
+        if not x:
+            return 0
+        if x < 2:
+            return x * 100
+        return x
+
+    df["payout_ratio"] = df["payout_ratio"].apply(normalize_payout)
+
+    # =============================
+    # FORMAT DATA NUMERIC
+    # =============================
+    df["last_dividend_1"] = df["last_dividend_1"].round(2)
+    df["last_dividend_2"] = df["last_dividend_2"].round(2)
+    df["price"] = df["price"].fillna(0)
+
+    # Base dividend terbesar
+    df["dividend_base"] = df[["last_dividend_1", "last_dividend_2"]].max(axis=1)
+
+    # =============================
+    # EXCLUDE YANG TIDAK ADA DIVIDEN
+    # =============================
+    df = df[
+        (df["dividend_base"] > 0) &
+        (df["price"] > 0)
+    ].copy()
+
+    # =============================
+    # SIMPAN DATETIME RAW UNTUK FILTER
+    # =============================
+    import pandas as pd
+    from datetime import datetime, timedelta
+
+    df["dt1"] = pd.to_datetime(df["last_dividend_date_1"], errors="coerce")
+    df["dt2"] = pd.to_datetime(df["last_dividend_date_2"], errors="coerce")
+
+    # =============================
+    # FILTER BULAN / TAHUN / UPCOMING
+    # =============================
+    st.subheader("🔎 Filter")
+
+    colf1, colf2, colf3 = st.columns(3)
+
+    # Bulan
+    bulan_list = {
+        "All": 0,
+        "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "Mei": 5, "Jun": 6,
+        "Jul": 7, "Agu": 8, "Sep": 9, "Okt": 10, "Nov": 11, "Des": 12
+    }
+    selected_month = colf1.selectbox("📅 Bulan Ex-Date", list(bulan_list.keys()))
+
+    # Tahun
+    years_available = sorted(
+        set(df["dt1"].dropna().dt.year.tolist()) |
+        set(df["dt2"].dropna().dt.year.tolist())
+    )
+    years_available = ["All"] + [str(y) for y in years_available]
+    selected_year = colf2.selectbox("🗓️ Tahun", years_available)
+
+    # Apply filter bulan
+    if selected_month != "All":
+        m = bulan_list[selected_month]
+        df = df[
+            (df["dt1"].dt.month == m) |
+            (df["dt2"].dt.month == m)
+        ]
+
+    # Apply filter tahun
+    if selected_year != "All":
+        y = int(selected_year)
+        df = df[
+            (df["dt1"].dt.year == y) |
+            (df["dt2"].dt.year == y)
+        ]
+
+    if df.empty:
+        st.warning("Tidak ada data sesuai filter.")
+        return
+
+    # =============================
+    # FORMAT TANGGAL (DISPLAY)
+    # =============================
+    bulan_map = {
+        "01": "Jan", "02": "Feb", "03": "Mar", "04": "Apr",
+        "05": "Mei", "06": "Jun", "07": "Jul", "08": "Agu",
+        "09": "Sep", "10": "Okt", "11": "Nov", "12": "Des"
+    }
+
+    def format_tanggal(tgl):
+        if pd.isna(tgl):
+            return "-"
+        tgl = str(pd.to_datetime(tgl).date())
+        y, m, d = tgl.split("-")
+        return f"{int(d)}-{bulan_map[m]}-{y}"
+
+    df["last_dividend_date_1"] = df["dt1"].apply(format_tanggal)
+    df["last_dividend_date_2"] = df["dt2"].apply(format_tanggal)
+
+    # Hilangin .JK
+    df["symbol"] = df["symbol"].str.replace(".JK", "", regex=False)
+
+    # =============================
+    # SORT GLOBAL (BASE DIVIDEND)
+    # =============================
+    df = df.sort_values("dividend_base", ascending=False).reset_index(drop=True)
+
+    # =============================
+    # CLASS 1: SIZE
+    # =============================
+    total = len(df)
+
+    def classify_dividend(idx):
+        pct = idx / total
+        if pct <= 0.2:
+            return "💰 Big"
+        elif pct <= 0.4:
+            return "🟢 High"
+        elif pct <= 0.6:
+            return "🟡 Medium"
+        elif pct <= 0.8:
+            return "🔵 Low"
+        else:
+            return "🌱 Tiny"
+
+    df["Class"] = [classify_dividend(i) for i in range(total)]
+
+    class_order = {
+        "💰 Big": 1,
+        "🟢 High": 2,
+        "🟡 Medium": 3,
+        "🔵 Low": 4,
+        "🌱 Tiny": 5
+    }
+    df["class_rank"] = df["Class"].map(class_order)
+
+    # =============================
+    # CLASS 2: TYPE
+    # =============================
+    cyclical_sectors = ["Energy", "Basic Materials"]
+
+    def classify_type(row):
+        years = row["years_paying"]
+        payout = row["payout_ratio"]
+        sector = row["sector"]
+
+        if payout > 100:
+            return "🔴 Risky"
+        elif sector in cyclical_sectors:
+            return "🔁 Cyclical"
+        elif years >= 10:
+            return "🏦 Stable"
+        elif years >= 3:
+            return "🌱 Growing"
+        else:
+            return "⚪ New"
+
+    df["Type"] = df.apply(classify_type, axis=1)
+
+    # =============================
+    # FORMAT PRICE
+    # =============================
+    def format_rupiah(x):
+        try:
+            return f"Rp {int(x):,}".replace(",", ".")
+        except:
+            return "-"
+
+    df["Harga"] = df["price"].apply(format_rupiah)
+
+    # =============================
+    # RENAME
+    # =============================
+    df = df.rename(columns={
+        "symbol": "Ticker",
+        "years_paying": "Years Paying",
+        "last_dividend_1": "Last Div 1",
+        "last_dividend_2": "Last Div 2",
+        "last_dividend_date_1": "Date 1",
+        "last_dividend_date_2": "Date 2",
+        "payout_ratio": "Payout Ratio (%)"
+    })
+
+    # =============================
+    # METRICS
+    # =============================
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Stocks", len(df))
+    col2.metric("Highest Dividend", f"{df['dividend_base'].max():,.0f}")
+    col3.metric("Avg Dividend", f"{df['dividend_base'].mean():,.0f}")
+
+    st.divider()
+
+    # =============================
+    # COLOR PAYOUT
+    # =============================
+    def color_payout(val):
+        try:
+            val = float(val)
+        except:
+            return ""
+        if val <= 50:
+            return "background-color:#d4edda;color:#155724;"
+        elif val <= 80:
+            return "background-color:#fff3cd;color:#856404;"
+        elif val <= 100:
+            return "background-color:#ffe5b4;color:#8a4b00;"
+        else:
+            return "background-color:#f8d7da;color:#721c24;"
+
+    # =============================
+    # LOOP PER SECTOR
+    # =============================
+    sectors = sorted(df["sector"].dropna().unique())
+
+    for sector in sectors:
+        sector_df = df[df["sector"] == sector].copy()
+
+        sector_df = sector_df.sort_values(
+            by=["class_rank", "price"],
+            ascending=[True, False]
+        ).reset_index(drop=True)
+
+        sector_df.insert(0, "Rank", range(1, len(sector_df) + 1))
+
+        sector_df = sector_df[
+            [
+                "Rank",
+                "Ticker",
+                "Harga",
+                "Class",
+                "Type",
+                "Last Div 1",
+                "Last Div 2",
+                "Years Paying",
+                "Payout Ratio (%)",
+                "Date 1",
+                "Date 2"
+            ]
+        ]
+
+        sector_icons = {
+            "Financial Services": "🏦",
+            "Energy": "🛢️",
+            "Consumer Defensive": "🛒",
+            "Consumer Cyclical": "🛍️",
+            "Industrials": "🏭",
+            "Basic Materials": "🧱",
+            "Healthcare": "💊",
+            "Technology": "💻",
+            "Communication Services": "📡",
+            "Utilities": "⚡",
+            "Real Estate": "🏢"
+        }
+
+        icon = sector_icons.get(sector, "📊")
+
+        st.subheader(f"{icon} {sector} ({len(sector_df)})")
+
+        styled_df = (
+            sector_df.style
+            .applymap(color_payout, subset=["Payout Ratio (%)"])
+            .format({
+                "Last Div 1": "{:,.2f}",
+                "Last Div 2": "{:,.2f}",
+                "Payout Ratio (%)": "{:,.2f}"
+            })
+        )
+
+        st.dataframe(
+            styled_df,
+            use_container_width=True,
+            hide_index=True
+        )
+
+        st.markdown("---")
 
 # ==========================================================
 # ======================= SCREENER =========================
@@ -854,12 +1157,25 @@ def render_trading_tracker():
 # ==========================================================
 # ======================= ROUTER ===========================
 # ==========================================================
-menu = st.sidebar.radio("📂 Menu", ["🔍 Screener", "📊 Stock Analysis", "📒 Trading Tracker"])
+menu = st.sidebar.radio(
+    "📂 Menu",
+    [
+        "🔍 Screener",
+        "📊 Stock Analysis",
+        "💰 Dividend Screener",
+        "📒 Trading Tracker"
+    ]
+)
 
 if menu == "🔍 Screener":
     render_screener()
+
 elif menu == "📊 Stock Analysis":
     render_stock_analysis()
+
+elif menu == "💰 Dividend Screener":
+    render_dividend_screener()
+
 else:
     render_trading_tracker()
 

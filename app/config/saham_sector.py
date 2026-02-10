@@ -1,6 +1,6 @@
 SAHAM_SECTOR = {
 
-    # ===== BANK & FINANCE =====
+    # ===== BANK =====
     "BBCA": "BANK",
     "BBRI": "BANK",
     "BMRI": "BANK",
@@ -12,20 +12,39 @@ SAHAM_SECTOR = {
     "BBTN": "BANK",
     "NISP": "BANK",
     "INPC": "BANK",
+    "BJBR": "BANK",
+    "BJTM": "BANK",
+    "MEGA": "BANK",
+    "PNBN": "BANK",
+    "BNLI": "BANK",
+    "AGRO": "BANK",
 
+    # ===== FINANCE =====
     "TRIM": "FINANCE",
     "AKSI": "FINANCE",
 
-    # ===== TELECOM / TOWER =====
+    # ===== TELECOM =====
     "TLKM": "TELECOM",
     "EXCL": "TELECOM",
     "ISAT": "TELECOM",
     "FREN": "TELECOM",
     "IBST": "TELECOM",
 
+    # ===== INFRA =====
     "MTEL": "INFRA",
+    "JSMR": "INFRA",
+    "CSIS": "INFRA",
+    "KBLV": "INFRA",
+    "FWCT": "INFRA",
+    "VKTR": "INFRA",
+    "OPMS": "INFRA",
+    "WIKA": "INFRA",
+    "WSKT": "INFRA",
+    "PTPP": "INFRA",
+    "ADHI": "INFRA",
+    "WEGE": "INFRA",
 
-    # ===== ENERGY & MINING =====
+    # ===== MINING =====
     "ADRO": "MINING",
     "ITMG": "MINING",
     "PTBA": "MINING",
@@ -47,7 +66,10 @@ SAHAM_SECTOR = {
     "ABMM": "MINING",
     "KKGI": "MINING",
     "POLU": "MINING",
+    "ADMR": "MINING",
+    "BYAN": "MINING",
 
+    # ===== ENERGY =====
     "ELSA": "ENERGY",
     "MEDC": "ENERGY",
     "AKRA": "ENERGY",
@@ -61,6 +83,10 @@ SAHAM_SECTOR = {
     "BREN": "ENERGY",
     "SUGI": "ENERGY",
     "GOLD": "ENERGY",
+    "DEWA": "ENERGY",
+    "ESSA": "ENERGY",
+    "PGEO": "ENERGY",
+    "KEEN": "ENERGY",
 
     # ===== CONSUMER =====
     "UNVR": "CONSUMER",
@@ -76,6 +102,11 @@ SAHAM_SECTOR = {
     "BUAH": "CONSUMER",
     "SIMA": "CONSUMER",
     "CINT": "CONSUMER",
+    "SIDO": "CONSUMER",
+    "ROTI": "CONSUMER",
+    "GOOD": "CONSUMER",
+    "HOKI": "CONSUMER",
+    "CAMP": "CONSUMER",
 
     # ===== RETAIL =====
     "AMRT": "RETAIL",
@@ -87,9 +118,12 @@ SAHAM_SECTOR = {
     "MPPA": "RETAIL",
     "FAST": "RETAIL",
     "DEPO": "RETAIL",
+    "LPPF": "RETAIL",
 
     # ===== AGRI =====
     "SMAR": "AGRI",
+    "AALI": "AGRI",
+    "LSIP": "AGRI",
 
     # ===== PROPERTY =====
     "CTRA": "PROPERTY",
@@ -115,15 +149,7 @@ SAHAM_SECTOR = {
     "REAL": "PROPERTY",
     "BKDP": "PROPERTY",
 
-    # ===== INFRA =====
-    "JSMR": "INFRA",
-    "CSIS": "INFRA",
-    "KBLV": "INFRA",
-    "FWCT": "INFRA",
-    "VKTR": "INFRA",
-    "OPMS": "INFRA",
-
-    # ===== TRANSPORT / LOGISTIC =====
+    # ===== TRANSPORT =====
     "ASSA": "TRANSPORT",
     "WEHA": "TRANSPORT",
     "LEAD": "TRANSPORT",
@@ -135,8 +161,11 @@ SAHAM_SECTOR = {
     "MEJA": "TRANSPORT",
     "LAJU": "TRANSPORT",
     "GTSI": "TRANSPORT",
+    "SMDR": "TRANSPORT",
+    "TMAS": "TRANSPORT",
+    "IPCM": "TRANSPORT",
 
-    # ===== TECH / DIGITAL =====
+    # ===== TECH =====
     "GOTO": "TECH",
     "BUKA": "TECH",
     "DCII": "TECH",
@@ -154,8 +183,12 @@ SAHAM_SECTOR = {
     "NETV": "TECH",
     "YELO": "TECH",
     "UANG": "TECH",
+    "BELI": "TECH",
+    "MTDL": "TECH",
+    "DNET": "TECH",
+    "MLPT": "TECH",
 
-    # ===== MANUFACTURING / INDUSTRIAL =====
+    # ===== MANUFACTURING =====
     "ASII": "MANUFACTURING",
     "GJTL": "MANUFACTURING",
     "POLY": "MANUFACTURING",
@@ -168,17 +201,20 @@ SAHAM_SECTOR = {
     "LMPI": "MANUFACTURING",
     "PACK": "MANUFACTURING",
     "TRJA": "MANUFACTURING",
+    "SMSM": "MANUFACTURING",
+    "UNTR": "MANUFACTURING",
 
     # ===== AUTO =====
     "AUTO": "AUTO",
     "IMAS": "AUTO",
 
-    # ===== HOLDING / INVESTMENT =====
+    # ===== HOLDING =====
     "TPIA": "INDUSTRIAL",
     "CUAN": "HOLDING",
     "CDIA": "HOLDING",
     "ALII": "HOLDING",
     "MTRA": "HOLDING",
+    "SRTG": "HOLDING",
 
     # ===== HEALTH =====
     "CARE": "HEALTH",
@@ -186,7 +222,7 @@ SAHAM_SECTOR = {
     # ===== MEDIA =====
     "STAR": "MEDIA",
 
-    # ===== OTHERS / SPECULATIVE =====
+    # ===== SPECULATIVE =====
     "SUPA": "SPECULATIVE",
     "RLCO": "SPECULATIVE",
     "PANI": "SPECULATIVE",
