@@ -24,6 +24,7 @@ import numpy as np
 
 from app.core.engine import ScreenerEngine
 from app.config.saham_list import SAHAM_LIST
+from app.config.saham_profile import SAHAM_PROFILE
 from app.config.dividend_list import DIVIDEND_LIST
 from app.renderers.telegram import render_telegram
 from app.services.telegram_bot import send_message
@@ -69,6 +70,10 @@ def price_position(last_price, entry_low, entry_high):
         return "BELOW"
     return "ABOVE"
 
+def format_date_indo(d):
+    if not d or pd.isna(d):
+        return "-"
+    return pd.to_datetime(d).strftime("%d-%b-%Y")
 
 def near_resistance(last_price, resistance, threshold_pct=4):
     return 0 <= (resistance - last_price) / resistance * 100 <= threshold_pct
@@ -96,6 +101,33 @@ def render_df(data):
     if "Score" in df.columns:
         df = df.style.applymap(score_color, subset=["Score"])
     st.dataframe(df, use_container_width=True)
+
+def require_trading_password():
+    SHARE_PASSWORD = st.secrets.get("SHARE_PASSWORD")
+
+    # kalau belum pernah login
+    if "trading_auth_time" not in st.session_state:
+        st.session_state.trading_auth_time = None
+
+    # cek apakah masih dalam 7 hari
+    if st.session_state.trading_auth_time:
+        if datetime.now() - st.session_state.trading_auth_time < timedelta(days=7):
+            return True  # masih valid
+
+    # ===== FORM PASSWORD =====
+    st.warning("🔒 Halaman ini dilindungi password")
+
+    password_input = st.text_input("Masukkan password", type="password")
+
+    if st.button("Login"):
+        if password_input == SHARE_PASSWORD:
+            st.session_state.trading_auth_time = datetime.now()
+            st.success("✅ Login berhasil")
+            st.rerun()
+        else:
+            st.error("❌ Password salah")
+
+    return False
 
 def calc_minor_support(df, lookback=12):
     """
@@ -139,7 +171,7 @@ def load_dividend_data(symbols):
 
 
 def render_dividend_screener():
-    st.title("💰 Dividend Screener")
+    st.header("💰 Dividend Screener")
     st.caption("Daftar saham dividen dipisah per sektor")
 
     symbols = [s + ".JK" for s in DIVIDEND_LIST]
@@ -711,9 +743,10 @@ def render_screener():
 # ==========================================================
 def render_stock_analysis():
     from app.utils.market_data import load_price_data
-    from app.utils.analysis_engine import analyze_single_stock
+    from app.utils.analysis_engine import analyze_single_stock, round_to_tick
     from app.config.saham_profile import SAHAM_PROFILE
     from app.utils.sector_utils import get_sector_badge
+    from datetime import datetime
 
     st.header("📊 Stock Analysis")
     st.caption("Analisa mandiri satu saham (independen dari screener)")
@@ -744,9 +777,6 @@ def render_stock_analysis():
         for k in ["analysis_result", "news_result", "analyzed"]:
             st.session_state.pop(k, None)
 
-    # =========================
-    # RESET SAAT INPUT BERUBAH
-    # =========================
     if st.session_state.get("last_analysis_kode") != kode:
         reset_analysis_state()
         st.session_state.last_analysis_kode = kode
@@ -774,11 +804,9 @@ def render_stock_analysis():
             result = analyze_single_stock(df)
             news_result = fetch_stock_news(kode)
 
-            # === tambahan untuk Support Minor (dipakai UI & Telegram) ===
             minor_support = calc_minor_support(df)
             result["minor_support"] = minor_support
 
-            # === simpan ke session_state ===
             st.session_state["analysis_result"] = result
             st.session_state["news_result"] = news_result
             st.session_state["analysis_timeframe"] = timeframe
@@ -791,6 +819,7 @@ def render_stock_analysis():
     result = st.session_state["analysis_result"]
     news_result = st.session_state["news_result"]
 
+    # ===================== MARKET CONDITION =====================
     st.subheader("🧭 Market Condition")
     c1, c2 = st.columns(2)
 
@@ -803,54 +832,59 @@ def render_stock_analysis():
             f"Rp {int(result['last_price']):,}".replace(",", "."),
         )
 
-    # ---------- Support Resistance ----------
+    # ===================== SUPPORT RESISTANCE =====================
     st.subheader("📉 Support & Resistance")
 
     df_price = st.session_state.get("analysis_df")
-    minor_support = calc_minor_support(df_price)
-    major_support = result["support"]
     last_price = result["last_price"]
+
+    major_support = result["support"]
+    minor_support = calc_minor_support(df_price)
+
+    # 🔹 NEW: Micro support (super dekat)
+    micro_support = int(df_price["Low"].tail(7).min())
 
     supports = []
 
-    if major_support is not None:
-        supports.append(("Major", major_support))
+    if micro_support is not None:
+        supports.append(("Micro", micro_support))
     if minor_support is not None:
         supports.append(("Minor", minor_support))
+    if major_support is not None:
+        supports.append(("Major", major_support))
+
+    # Urutkan dari yang paling dekat ke harga sekarang
+    supports_sorted = sorted(
+        supports,
+        key=lambda x: abs(last_price - x[1])
+    )
 
     rows = []
 
-    # ===== NEAR / FAR LOGIC (SAMA DENGAN TELEGRAM) =====
-    if len(supports) == 2:
-        supports_sorted = sorted(
-            supports,
-            key=lambda x: abs(last_price - x[1])
-        )
-
-        near_label, near_val = supports_sorted[0]
-        far_label, far_val = supports_sorted[1]
-
-        rows.extend([
-            (
-                "Support (Near)",
-                f"Rp {int(near_val):,} ({near_label})".replace(",", "."),
-            ),
-            (
-                "Support (Far)",
-                f"Rp {int(far_val):,} ({far_label})".replace(",", "."),
-            ),
-        ])
-
-    elif len(supports) == 1:
-        label, val = supports[0]
+    if len(supports_sorted) >= 1:
         rows.append(
             (
-                f"Support ({label})",
-                f"Rp {int(val):,}".replace(",", "."),
+                "Support (Near)",
+                f"Rp {int(supports_sorted[0][1]):,} ({supports_sorted[0][0]})".replace(",", "."),
             )
         )
 
-    # ===== RESISTANCE =====
+    if len(supports_sorted) >= 2:
+        rows.append(
+            (
+                "Support (Mid)",
+                f"Rp {int(supports_sorted[1][1]):,} ({supports_sorted[1][0]})".replace(",", "."),
+            )
+        )
+
+    if len(supports_sorted) >= 3:
+        rows.append(
+            (
+                "Support (Far)",
+                f"Rp {int(supports_sorted[2][1]):,} ({supports_sorted[2][0]})".replace(",", "."),
+            )
+        )
+
     rows.append(
         (
             "Resistance",
@@ -862,47 +896,100 @@ def render_stock_analysis():
     st.table(sr_df.set_index("Level"))
 
 
-    # ---------- Entry ----------
+    # ===================== ENTRY PLAN =====================
     st.subheader("🎯 Entry Plan")
 
-    # ===== DEFAULT (WAJIB ADA) =====
-    entry_low, entry_high = result["entry_zone"]
-    entry_label = "Entry Zone (Default)"
+    # Support yang sudah diurutkan sebelumnya
+    near_support = supports_sorted[0][1]
+
+    deep_support = None
+    if len(supports_sorted) >= 2:
+        deep_support = supports_sorted[1][1]
+    else:
+        deep_support = supports_sorted[0][1]
+
+    # 🔹 ENTRY NEAR (agresif)
+    entry_near_low = round_to_tick(near_support * 0.995)
+    entry_near_high = round_to_tick(near_support * 1.015)
+
+    # 🔹 ENTRY DEEP (lebih sabar)
+    entry_deep_low = round_to_tick(deep_support * 0.99)
+    entry_deep_high = round_to_tick(deep_support * 1.02)
 
     entry_df = pd.DataFrame(
         {
-            "Parameter": [entry_label, "Risk"],
+            "Parameter": [
+                "Entry Near (Pullback)",
+                "Entry Deep (Discount)",
+                "Risk",
+            ],
             "Value": [
-                f"Rp {int(entry_low):,} – Rp {int(entry_high):,}".replace(",", "."),
+                f"Rp {entry_near_low:,} – Rp {entry_near_high:,}".replace(",", "."),
+                f"Rp {entry_deep_low:,} – Rp {entry_deep_high:,}".replace(",", "."),
                 f"{result['risk_pct']} %",
             ],
         }
     )
 
-    # ===== SMART ENTRY (OPTIONAL OVERRIDE) =====
-    if minor_support is not None:
-        buffer_pct = 0.015  # 1.5%
-        smart_low = minor_support
-        smart_high = minor_support * (1 + buffer_pct)
-
-        last_price = result["last_price"]
-
-        if smart_low <= last_price <= smart_high * 1.05:
-            entry_df = pd.DataFrame(
-                {
-                    "Parameter": ["Entry Zone (Support Minor)", "Risk"],
-                    "Value": [
-                        f"Rp {int(smart_low):,} – Rp {int(smart_high):,}".replace(",", "."),
-                        f"{result['risk_pct']} %",
-                    ],
-                }
-            )
-
-    # ===== RENDER (AMAN) =====
     st.table(entry_df.set_index("Parameter"))
 
 
-        # ---------- News ----------
+    # ===================== CYCLE PROJECTION =====================
+    cycle = result.get("cycle")
+
+    if cycle:
+        st.subheader("📅 Cycle Projection")
+
+        def format_date_only(date_str):
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+            return dt.strftime("%d-%b-%Y")
+
+        def format_range(start, end):
+            s = datetime.strptime(start, "%Y-%m-%d").strftime("%d-%b-%Y")
+            e = datetime.strptime(end, "%Y-%m-%d").strftime("%d-%b-%Y")
+            return f"{s} - {e}"
+
+        # ===================== CYCLE LOW WINDOW =====================
+        st.markdown("**📉 Cycle Low Window**")
+
+        low_df = pd.DataFrame(
+            {
+                "Parameter": [
+                    "Last Major Low",
+                    "Near Cycle Low",
+                    "Next Cycle Low",
+                ],
+                "Value": [
+                    format_date_only(cycle["last_low"]),
+                    format_range(cycle["next_low_start"], cycle["next_low_end"]),
+                    format_range(cycle["second_low_start"], cycle["second_low_end"]),
+                ],
+            }
+        )
+
+        st.table(low_df.set_index("Parameter"))
+
+        # ===================== CYCLE HIGH WINDOW =====================
+        st.markdown("**📈 Cycle High Window**")
+
+        high_df = pd.DataFrame(
+            {
+                "Parameter": [
+                    "Near High Window",
+                    "Next High Window",
+                ],
+                "Value": [
+                    format_range(cycle["next_high_start"], cycle["next_high_end"]),
+                    format_range(cycle["second_high_start"], cycle["second_high_end"]),
+                ],
+            }
+        )
+
+        st.table(high_df.set_index("Parameter"))
+
+
+
+    # ===================== NEWS =====================
     st.subheader("📰 News & Sentiment")
     sent = news_result.get("sentiment")
 
@@ -915,14 +1002,12 @@ def render_stock_analysis():
     else:
         st.info("⚪ Tidak ada sentimen berita signifikan")
 
-    # 🔗 LINK BERITA (SELALU DITAMPILKAN, SAMA SEPERTI VERSI LAMA YANG DIHARAPKAN)
     if news_result.get("news"):
         for n in news_result["news"][:5]:
             if n.get("title") and n.get("link"):
                 st.markdown(f"- [{n['title']}]({n['link']})")
 
-    # ---------- Insight ----------
-
+    # ===================== INSIGHT =====================
     st.subheader("🧠 Insight")
     trend = result["trend"]
 
@@ -941,6 +1026,8 @@ def render_stock_analysis():
     else:
         insight_text = "Market sideways / transisi. Perlu konfirmasi tambahan."
         st.info("➡️ " + insight_text)
+
+
 
     # ===================== SEND TELEGRAM =====================
     st.subheader("📤 Share Analysis")
@@ -968,7 +1055,9 @@ def render_stock_analysis():
                 analysis=result,
                 news_result=news_result,
                 insight_text=insight_text,
+                df_price=st.session_state["analysis_df"],   # ← WAJIB TAMBAH INI
             )
+
             send_message(msg)
             st.success("Terkirim ke Telegram ✅")
         except Exception as e:
@@ -981,8 +1070,43 @@ def render_stock_analysis():
 # ==========================================================
 # =================== TRADING TRACKER ======================
 # ==========================================================
-def render_trading_tracker():
-    st.header("📒 Trading Tracker (Journal)")
+from datetime import datetime, timedelta
+
+def format_holding_days(days):
+    if days is None or days == 0:
+        return "0 hari"
+
+    years = days // 365
+    months = (days % 365) // 30
+    remaining_days = (days % 365) % 30
+
+    parts = []
+    if years:
+        parts.append(f"{years} thn -")
+    if months:
+        parts.append(f"{months} bln -")
+    if remaining_days:
+        parts.append(f"{remaining_days} hari")
+
+    return " ".join(parts)
+
+
+def render_trading_summary():
+    if not require_trading_password():
+        return
+
+    st.header("📊 Trading Tracker - Summary")
+
+    import os
+    import pandas as pd
+
+    DIV_FILE = "dividends.csv"
+
+    if not os.path.exists(DIV_FILE):
+        pd.DataFrame(columns=["trade_id", "date", "amount"]).to_csv(DIV_FILE, index=False)
+
+    def load_dividends():
+        return pd.read_csv(DIV_FILE)
 
     # ===================== BUY =====================
     with st.form("add_buy"):
@@ -998,161 +1122,312 @@ def render_trading_tracker():
             buy_date = st.date_input("Tanggal Beli", value=date.today())
             note = st.text_input("Catatan (opsional)")
 
-        if st.form_submit_button("Simpan BUY"):
-            save_buy(
-                kode=kode,
-                buy_date=buy_date,
-                buy_price=buy_price,
-                buy_lot=buy_lot,
-                note=note,
-            )
-            st.success("BUY dicatat ✅")
-            st.divider()
+        submitted_buy = st.form_submit_button("Simpan BUY")
+
+        if submitted_buy:
+            if buy_price < 1:
+                st.error("❌ Harga beli minimal 1")
+            else:
+                save_buy(kode, buy_date, buy_price, buy_lot, note)
+                st.success("BUY dicatat ✅")
+                st.rerun()
+
+    # ===================== LOAD DATA =====================
+    df_trades = enrich_trades(load_trades())
+    df_div = load_dividends()
+
+    st.subheader("📊 Trading Summary")
+
+    if df_trades.empty:
+        st.info("Belum ada trade yang tercatat.")
+        return
+
+    df_trades["Modal"] = df_trades["Buy"] * df_trades["Sisa Lot"] * 100
+
+    total_modal = df_trades["Modal"].sum()
+    total_capital = df_trades["PnL (Rp)"].sum()
+    total_dividend = df_div["amount"].sum() if not df_div.empty else 0
+    total_profit = total_capital + total_dividend
+    profit_pct = (total_profit / total_modal * 100) if total_modal > 0 else 0
+
+    def rp(x):
+        return f"Rp {int(x):,}".replace(",", ".")
+
+    # ===================== METRICS =====================
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Modal", rp(total_modal))
+    c2.metric("Capital Gain", rp(total_capital))
+    c3.metric("Dividend", rp(total_dividend))
+
+    c4, c5, spacer = st.columns(3)
+    c4.metric("Total Profit", rp(total_profit))
+    c5.metric("Profit %", f"{profit_pct:.1f}%")
+    spacer.empty()
+
+    st.divider()
+
+    # ===================== TRADING HISTORY =====================
+    st.subheader("📋 Trading History")
+
+    table_df = df_trades.copy()
+
+    # Nama perusahaan
+    table_df["Nama"] = table_df["Kode"].apply(
+        lambda x: SAHAM_PROFILE.get(x, x)
+    )
+
+    # Format tanggal
+    table_df["Buy Date"] = table_df["buy_date"].apply(format_date_indo)
+    table_df["Sell Date"] = table_df["Sell Date"].apply(format_date_indo)
+
+    # Format holding days
+    table_df["Holding Days"] = table_df["Holding Days"].apply(format_holding_days)
+
+    # Sorting terbaru
+    table_df = table_df.sort_values("buy_date", ascending=False)
+
+    table_df = table_df[
+        [
+            "Kode",
+            "Nama",
+            "Buy Date",
+            "Sell Date",
+            "Buy",
+            "Now",
+            "Sisa Lot",
+            "Status",
+            "Holding Days",
+            "PnL (Rp)",
+            "PnL (%)",
+        ]
+    ]
+
+    table_df["PnL (Rp)"] = table_df["PnL (Rp)"].apply(rp)
+    table_df["PnL (%)"] = table_df["PnL (%)"].apply(lambda x: f"{x:.1f}%")
+
+    st.dataframe(table_df, use_container_width=True, hide_index=True)
+
+    # ===================== DIVIDEND HISTORY =====================
+    st.subheader("💰 Dividend History")
+
+    if df_div.empty:
+        st.info("Belum ada dividen tercatat.")
+    else:
+        div_table = df_div.copy()
+
+        # Ambil kode dari trade
+        div_table["Kode"] = div_table["trade_id"].apply(
+            lambda i: df_trades.loc[i, "Kode"] if i in df_trades.index else "-"
+        )
+
+        # Nama perusahaan
+        div_table["Nama"] = div_table["Kode"].apply(
+            lambda x: SAHAM_PROFILE.get(x, x)
+        )
+
+        div_table["date"] = pd.to_datetime(div_table["date"])
+
+        # Sort: kode → tanggal terbaru
+        div_table = div_table.sort_values(
+            by=["Kode", "date"],
+            ascending=[True, False]
+        )
+
+        # Format tanggal
+        div_table["Tanggal"] = div_table["date"].apply(
+            lambda x: x.strftime("%d-%b-%Y")
+        )
+
+        # Format rupiah
+        div_table["Dividen"] = div_table["amount"].apply(rp)
+
+        show_df = div_table[["Kode", "Nama", "Tanggal", "Dividen"]]
+
+        st.dataframe(
+            show_df,
+            use_container_width=True,
+            hide_index=True
+        )
+
+    # ===================== TAMBAH DIVIDEN =====================
+    df = load_trades()
+    st.subheader("➕ Tambah Dividen")
+
+    def save_dividend(trade_id, date, amount):
+        df = load_dividends()
+        new_row = pd.DataFrame([{
+            "trade_id": trade_id,
+            "date": date,
+            "amount": amount
+        }])
+        df = pd.concat([df, new_row], ignore_index=True)
+        df.to_csv(DIV_FILE, index=False)
+
+    idx_div = st.selectbox(
+        "Pilih Trade",
+        df.index,
+        format_func=lambda i: f"{df.loc[i,'kode']} | {df.loc[i,'remaining_lot']} lot"
+    )
+
+    div_date = st.date_input("Tanggal Dividen", value=date.today())
+    div_amount = st.number_input("Nominal Dividen (Rp)", min_value=0)
+
+    if st.button("Simpan Dividen"):
+        if div_amount < 1:
+            st.error("❌ Nominal dividen minimal 1")
+        else:
+            save_dividend(idx_div, div_date, div_amount)
+            st.session_state["div_success"] = True
+            st.rerun()
+
+    if "div_success" in st.session_state:
+        st.success("✅ Dividen berhasil disimpan")
+        del st.session_state["div_success"]
+
+
+
+def render_manage_data():
+    if not require_trading_password():
+        return
+    st.header("⚙️ Trading Tracker - Manage Data")
+
+    import os
+    import pandas as pd
+
+    DIV_FILE = "dividends.csv"
+
+    if not os.path.exists(DIV_FILE):
+        pd.DataFrame(columns=["trade_id", "date", "amount"]).to_csv(DIV_FILE, index=False)
+
+    def load_dividends():
+        return pd.read_csv(DIV_FILE)
+
+    def delete_dividends_by_trade(trade_id):
+        df = load_dividends()
+        df = df[df["trade_id"] != trade_id]
+        df.to_csv(DIV_FILE, index=False)
+
+    df_trades = enrich_trades(load_trades())
+    df_div = load_dividends()
 
     # ===================== SELL =====================
     df = load_trades()
-    if not df.empty:
-        df["remaining_lot"] = pd.to_numeric(df["remaining_lot"], errors="coerce").fillna(0).astype(int)
+    df["remaining_lot"] = pd.to_numeric(df["remaining_lot"], errors="coerce").fillna(0).astype(int)
+    open_trades = df[df["remaining_lot"] > 0]
 
-        open_trades = df[df["remaining_lot"] > 0]
+    if not open_trades.empty:
+        st.subheader("✏️ Jual")
 
-        if not open_trades.empty:
-            st.subheader("✏️ Jual (Partial / Full)")
+        idx = st.selectbox(
+            "Pilih posisi",
+            open_trades.index,
+            format_func=lambda i: f"{df.loc[i,'kode']} | {df.loc[i,'remaining_lot']} lot",
+        )
 
-            idx = st.selectbox(
-                "Pilih posisi",
-                open_trades.index,
-                format_func=lambda i: f"{df.loc[i,'kode']} | Sisa {df.loc[i,'remaining_lot']} lot",
-            )
+        remaining_lot = int(df.loc[idx, "remaining_lot"])
 
-            # =====================
-            # INIT STATE
-            # =====================
-            if "sell_attempted" not in st.session_state:
-                st.session_state.sell_attempted = False
+        sell_price = st.number_input("Harga Jual", min_value=0)
+        sell_lot = st.number_input("Lot Dijual", min_value=0, value=0)
+        sell_date = st.date_input("Tanggal Jual", value=date.today())
 
-            # =====================
-            # INPUT
-            # =====================
-            remaining_lot = int(df.loc[idx, "remaining_lot"])
-
-            sell_price = st.number_input("Harga Jual", min_value=0, step=1, key="sell_price")
-            sell_lot = st.number_input(
-                "Lot Dijual",
-                min_value=0,
-                step=1,
-                value=0,
-                key="sell_lot",
-            )
-            sell_date = st.date_input("Tanggal Jual", value=date.today(), key="sell_date")
-
-            # =====================
-            # VALIDATION (SILENT)
-            # =====================
+        if st.button("Jual"):
             errors = []
 
-            if sell_price <= 0:
-                errors.append("Harga jual harus lebih dari 0")
-            if sell_lot <= 0:
+            if sell_price < 1:
+                errors.append("Harga jual minimal 1")
+
+            if sell_lot < 1:
                 errors.append("Lot jual minimal 1")
+
             if sell_lot > remaining_lot:
-                errors.append(f"Lot jual tidak boleh lebih dari {remaining_lot} lot")
+                errors.append(f"Lot jual tidak boleh lebih dari {remaining_lot}")
 
-            is_invalid = len(errors) > 0
-
-            # =====================
-            # BONUS: PREVIEW P/L
-            # =====================
-            buy_price = float(df.loc[idx, "buy_price"])
-
-            if sell_price > 0 and sell_lot > 0:
-                pnl_per_lot = (sell_price - buy_price) * 100
-                pnl_total = pnl_per_lot * sell_lot
-
-                if pnl_total >= 0:
-                    st.success(f"📈 Estimasi P/L: Rp {pnl_total:,.0f}".replace(",", "."))
-                else:
-                    st.warning(f"📉 Estimasi P/L: Rp {pnl_total:,.0f}".replace(",", "."))
-
-            # =====================
-            # ACTION BUTTON
-            # =====================
-            jual_clicked = st.button("Jual", disabled=is_invalid)
-
-            if jual_clicked:
-                st.session_state.sell_attempted = True
-
-            # =====================
-            # SHOW ERROR (AFTER CLICK ONLY)
-            # =====================
-            if st.session_state.sell_attempted and is_invalid:
-                for err in errors:
-                    st.error(f"❌ {err}")
-
-            # =====================
-            # BACKEND GUARD + EXECUTE
-            # =====================
-            if jual_clicked and not is_invalid:
+            if errors:
+                for e in errors:
+                    st.error(f"❌ {e}")
+            else:
                 save_sell(idx, sell_date, sell_price, sell_lot)
-                st.success("Transaksi jual tercatat ✅")
-                st.session_state.sell_attempted = False
+                st.success("Transaksi jual tercatat")
                 st.rerun()
-                st.divider()
 
-    # ===================== HISTORY =====================
-    st.subheader("📊 Trading History")
+    # ===================== DELETE TRADE =====================
+    st.divider()
+    st.subheader("🗑️ Hapus Trade")
 
-    df_view = enrich_trades(load_trades())
+    selected_idx = st.selectbox(
+        "Pilih trade",
+        df_trades.index,
+        format_func=lambda i: f"{df_trades.loc[i,'Kode']} | {df_trades.loc[i,'Buy']}"
+    )
 
-    if df_view.empty:
-        st.info("Belum ada trade.")
+    if st.button("Hapus Trade"):
+        st.session_state["confirm_delete_trade"] = selected_idx
+
+    if "confirm_delete_trade" in st.session_state:
+        idx_confirm = st.session_state["confirm_delete_trade"]
+
+        st.warning("⚠️ Anda yakin ingin menghapus trade ini beserta semua dividennya?")
+
+        col1, col2 = st.columns(2)
+
+        if col1.button("❌ Batal"):
+            del st.session_state["confirm_delete_trade"]
+
+        if col2.button("🗑️ Ya, Hapus Permanen"):
+            delete_trade(idx_confirm)
+            delete_dividends_by_trade(idx_confirm)
+            del st.session_state["confirm_delete_trade"]
+            st.success("Trade & dividen terkait berhasil dihapus")
+            st.rerun()
+
+    # ===================== DELETE DIVIDEND =====================
+    st.subheader("🧾 Hapus Dividen")
+
+    if df_div.empty:
+        st.info("Belum ada dividen untuk dihapus.")
     else:
-        for idx, row in df_view.iterrows():
-            col_left, col_right = st.columns([8, 2])
+        div_options = df_div.reset_index()
 
-            sell_info = (
-                f"Sell Date: {row['Sell Date']}"
-                if row["Status"] in ["CLOSED", "PARTIAL"] and row["Sell Date"] != ""
-                else "Sell Date: -"
-            )
+        def format_div_option(i):
+            trade_id = div_options.loc[i, "trade_id"]
 
-            # ===== LEFT: INFO =====
-            with col_left:
-                st.markdown(
-                    f"""
-                    **{row['Kode']}**  
-                    Buy Date: {row['buy_date']} (**{row['Holding Days']} hari**)  
-                    {sell_info}  
-                    Buy: {row['Buy']} | Now: {row['Now']}  
-                    Sisa Lot: {row['Sisa Lot']}  
-                    Status: **{row['Status']}**  
-                    P/L: Rp {row['PnL (Rp)']:,} ({row['PnL (%)']}%)
-                    """,
-                    unsafe_allow_html=True,
-                )
+            if trade_id in df_trades.index:
+                kode = df_trades.loc[trade_id, "Kode"]
+            else:
+                kode = "(Trade sudah dihapus)"
 
-            # ===== RIGHT: ACTION =====
-            with col_right:
-                if st.button("🗑️ Hapus", key=f"del_{idx}", use_container_width=True):
-                    st.session_state["delete_target"] = idx
+            tanggal = div_options.loc[i, "date"]
+            amount = f"Rp {int(div_options.loc[i,'amount']):,}".replace(",", ".")
 
-                if st.session_state.get("delete_target") == idx:
-                    st.warning("⚠️ Yakin hapus trade ini?")
-                    if st.button("❌ Batal", key=f"cancel_{idx}", use_container_width=True):
-                        st.session_state.pop("delete_target")
+            return f"{kode} | {tanggal} | {amount}"
 
-                    if st.button(
-                        "✅ Hapus Permanen",
-                        key=f"confirm_{idx}",
-                        type="primary",
-                        use_container_width=True,
-                    ):
-                        delete_trade(idx)
-                        st.session_state.pop("delete_target")
-                        st.rerun()
+        selected_div = st.selectbox(
+            "Pilih dividen",
+            div_options["index"],
+            format_func=format_div_option
+        )
 
-            st.divider()
+        if st.button("Hapus Dividen"):
+            st.session_state["confirm_delete_div"] = selected_div
 
+        if "confirm_delete_div" in st.session_state:
+            idx_div_confirm = st.session_state["confirm_delete_div"]
+
+            st.warning("⚠️ Anda yakin ingin menghapus dividen ini?")
+
+            col1, col2 = st.columns(2)
+
+            if col1.button("❌ Batal", key="cancel_div"):
+                del st.session_state["confirm_delete_div"]
+
+            if col2.button("🗑️ Ya, Hapus", key="confirm_div"):
+                df_div2 = load_dividends()
+                df_div2 = df_div2.drop(idx_div_confirm)
+                df_div2.to_csv(DIV_FILE, index=False)
+
+                del st.session_state["confirm_delete_div"]
+                st.success("Dividen berhasil dihapus")
+                st.rerun()    
 
 # ==========================================================
 # ======================= ROUTER ===========================
@@ -1163,7 +1438,8 @@ menu = st.sidebar.radio(
         "🔍 Screener",
         "📊 Stock Analysis",
         "💰 Dividend Screener",
-        "📒 Trading Tracker"
+        "📒 Trading Tracker - Summary",
+        "⚙️ Trading Tracker - Manage"
     ]
 )
 
@@ -1176,8 +1452,11 @@ elif menu == "📊 Stock Analysis":
 elif menu == "💰 Dividend Screener":
     render_dividend_screener()
 
-else:
-    render_trading_tracker()
+elif menu == "📒 Trading Tracker - Summary":
+    render_trading_summary()
+
+elif menu == "⚙️ Trading Tracker - Manage":
+    render_manage_data()
 
 # ==========================================================
 # FOOTER
