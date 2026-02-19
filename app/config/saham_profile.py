@@ -147,7 +147,6 @@ SAHAM_PROFILE = {
     "DCII": "DCI Indonesia Tbk",
     "MCAS": "M Cash Integrasi Tbk",
     "WIFI": "Solusi Sinergi Digital Tbk",
-    "EDGE": "Indointernet Tbk",
     "ENVY": "Envy Technologies Indonesia Tbk",
     "COIN": "Indo Digital Nusantara Tbk",
     "DIVA": "Distribusi Voucher Nusantara Tbk",
@@ -214,4 +213,29 @@ SAHAM_PROFILE = {
     "CBMF": "Cahaya Bintang Medan Tbk",
     "HITS": "Humpuss Intermoda Transportasi Tbk",
     "ESTA": "Esta Multi Usaha Tbk",
+
+    # ==============================
+    # ENERGY & MINING (ADDITIONAL)
+    # ==============================
+    "RMKO": "RMK Energy Tbk",
+    "BULL": "Buana Lintas Lautan Tbk",
+    "OASA": "Protech Mitra Perkasa Tbk",
+
+    # ==============================
+    # PROPERTY (ADDITIONAL)
+    # ==============================
+    "BUVA": "Bukit Uluwatu Villa Tbk",
+
+    # ==============================
+    # ENERGY / SHIPPING (EXTRA REFERENCES)
+    # ==============================
+    "DSSA": "Dian Swastatika Sentosa Tbk",
+    "FIRE": "Alfa Energi Investama Tbk",
+    "HAIS": "Hasnur Internasional Shipping Tbk",
+    "WINS": "Wintermar Offshore Marine Tbk",
+    "SAFE": "Steady Safe Tbk",
+    "DKFT": "Central Omega Resources Tbk",
+    "IFSH": "Ifishdeco Tbk",
+    "URBN": "Urban Jakarta Propertindo Tbk",
+    "NATO": "Surya Permata Andalan Tbk"
 }

@@ -16,6 +16,7 @@ SAHAM_LIST = [
     "BREN","NICL","NCKL","PSAB","SMRU",
     "ABMM","CINT","GOLD","KKGI",
     "ADMR","DEWA","BYAN","ESSA","PGEO","KEEN",
+    "RMKO","BULL","OASA",   # <-- added
 
     # ===== CONSUMER & RETAIL =====
     "ERAA","ACES","MAPI","RALS","AMRT",
@@ -28,6 +29,7 @@ SAHAM_LIST = [
     "CTRA","BSDE","PWON","ASRI","SMRA",
     "BKSL","EMDE","DMAS","GPRA","PPRO",
     "CITY","APLN","DILD","LPKR",
+    "BUVA",   # <-- added
 
     # ===== INFRA / TRANSPORT =====
     "JSMR","EXCL","ISAT","MTEL",
@@ -39,7 +41,7 @@ SAHAM_LIST = [
 
     # ===== TECH / DIGITAL =====
     "GOTO","BUKA","DCII","MCAS","WIFI",
-    "EDGE","ENVY","COIN",
+    "ENVY","COIN",
     "DIVA","MORA","UANG","AKSI",
     "MMIX","DGNS","TFAS","SOTS",
     "BELI","MTDL","DNET","MLPT",

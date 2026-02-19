@@ -237,4 +237,26 @@ SAHAM_SECTOR = {
     "CBMF": "SPECULATIVE",
     "ESTA": "SPECULATIVE",
     "CASH": "SPECULATIVE",
+
+    # ===== MINING (ADDITIONAL) =====
+    "RMKO": "MINING",
+    "DSSA": "MINING",
+    "FIRE": "MINING",
+    "DKFT": "MINING",
+    "IFSH": "MINING",
+
+    # ===== ENERGY (ADDITIONAL) =====
+    "OASA": "ENERGY",
+
+    # ===== PROPERTY (ADDITIONAL) =====
+    "BUVA": "PROPERTY",
+    "URBN": "PROPERTY",
+    "NATO": "PROPERTY",
+
+    # ===== TRANSPORT (ADDITIONAL) =====
+    "BULL": "TRANSPORT",
+    "HAIS": "TRANSPORT",
+    "WINS": "TRANSPORT",
+    "SAFE": "TRANSPORT",
+
 }
