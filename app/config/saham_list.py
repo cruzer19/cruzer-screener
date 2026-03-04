@@ -16,7 +16,18 @@ SAHAM_LIST = [
     "BREN","NICL","NCKL","PSAB","SMRU",
     "ABMM","CINT","GOLD","KKGI",
     "ADMR","DEWA","BYAN","ESSA","PGEO","KEEN",
-    "RMKO","BULL","OASA",   # <-- added
+    "RMKO","BULL","OASA",
+
+    # ===== ENERGY (OIL & GAS – 2nd liner / speculative) =====
+    "ENRG",   # ⬅ added
+    "BIPI",   # ⬅ added
+    "APEX",   # ⬅ added
+    "RIGS",   # ⬅ added
+    "PSSI",   # already infra-ish but often traded with energy theme
+    "CBRE",   # ⬅ added
+    "SUGI",   # ⬅ added (oil & gas related)
+    "RUIS",   # ⬅ added
+    "KOPI",   # ⬅ added (energy-linked momentum)
 
     # ===== CONSUMER & RETAIL =====
     "ERAA","ACES","MAPI","RALS","AMRT",
@@ -29,7 +40,7 @@ SAHAM_LIST = [
     "CTRA","BSDE","PWON","ASRI","SMRA",
     "BKSL","EMDE","DMAS","GPRA","PPRO",
     "CITY","APLN","DILD","LPKR",
-    "BUVA",   # <-- added
+    "BUVA",
 
     # ===== INFRA / TRANSPORT =====
     "JSMR","EXCL","ISAT","MTEL",
@@ -63,6 +74,6 @@ SAHAM_LIST = [
     "LAJU","STAR","BOGA","AGII","TAYS",
     "PSKT","TOOL","NETV","CASH","MPRO",
     "NUSA","YELO","PURI","GAMA","MEJA",
-    "SIMA","SUGI","UFOE","SMMT","INPC",
+    "SIMA","UFOE","SMMT","INPC",
     "POLU","MTSM","CBMF","HITS","ESTA"
 ]

@@ -259,4 +259,13 @@ SAHAM_SECTOR = {
     "WINS": "TRANSPORT",
     "SAFE": "TRANSPORT",
 
+    # ===== ENERGY (OIL & GAS ADDITIONAL) =====
+    "ENRG": "ENERGY",
+    "BIPI": "ENERGY",
+    "APEX": "ENERGY",
+    "RIGS": "ENERGY",
+    "CBRE": "ENERGY",
+    "RUIS": "ENERGY",
+    "KOPI": "ENERGY",
+
 }

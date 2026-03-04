@@ -237,5 +237,23 @@ SAHAM_PROFILE = {
     "DKFT": "Central Omega Resources Tbk",
     "IFSH": "Ifishdeco Tbk",
     "URBN": "Urban Jakarta Propertindo Tbk",
-    "NATO": "Surya Permata Andalan Tbk"
+    "NATO": "Surya Permata Andalan Tbk",
+
+    # ==============================
+    # ENERGY / OIL & GAS (ADDITIONAL)
+    # ==============================
+    "ENRG": "Energi Mega Persada Tbk",
+    "BIPI": "Astrindo Nusantara Infrastruktur Tbk",
+    "APEX": "Apexindo Pratama Duta Tbk",
+    "RIGS": "Rig Tenders Indonesia Tbk",
+    "CBRE": "Cakra Buana Resources Energi Tbk",
+    "RUIS": "Radiant Utama Interinsco Tbk",
+    "KOPI": "Mitra Energi Persada Tbk",
+
+    # ==============================
+    # COAL / ENERGY TRADING
+    # ==============================
+    "CINT": "Chitose Internasional Tbk",
+    "GOLD": "Visi Telekomunikasi Infrastruktur Tbk"
+
 }
