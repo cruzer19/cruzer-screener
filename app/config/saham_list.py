@@ -1,4 +1,5 @@
 SAHAM_LIST = [
+
     # ===== BIG CAP / BLUECHIP =====
     "BBCA","BBRI","BMRI","BBNI","TLKM",
     "ASII","ICBP","INDF","MYOR",
@@ -7,6 +8,7 @@ SAHAM_LIST = [
     # ===== BANK & FINANCE =====
     "ARTO","BRIS","BTPS","BNGA","BBTN","NISP",
     "BJBR","BJTM","MEGA","PNBN","BNLI","AGRO",
+    "BDMN","BNII",
 
     # ===== ENERGY & MINING =====
     "ADRO","ITMG","PTBA","MEDC","AKRA",
@@ -19,15 +21,7 @@ SAHAM_LIST = [
     "RMKO","BULL","OASA",
 
     # ===== ENERGY (OIL & GAS – 2nd liner / speculative) =====
-    "ENRG",   # ⬅ added
-    "BIPI",   # ⬅ added
-    "APEX",   # ⬅ added
-    "RIGS",   # ⬅ added
-    "PSSI",   # already infra-ish but often traded with energy theme
-    "CBRE",   # ⬅ added
-    "SUGI",   # ⬅ added (oil & gas related)
-    "RUIS",   # ⬅ added
-    "KOPI",   # ⬅ added (energy-linked momentum)
+    "ENRG","BIPI","APEX","RIGS","PSSI","CBRE","SUGI","RUIS","KOPI",
 
     # ===== CONSUMER & RETAIL =====
     "ERAA","ACES","MAPI","RALS","AMRT",
@@ -35,20 +29,20 @@ SAHAM_LIST = [
     "WINGS","KINO","FAST","LPPF",
     "SMAR","ALII","DEPO","CARE","DOSS",
     "SIDO","ROTI","GOOD","HOKI","CAMP",
+    "HMSP","GGRM","TCID","WIIM",
 
-    # ===== PROPERTY (BIG → SMALL) =====
+    # ===== PROPERTY =====
     "CTRA","BSDE","PWON","ASRI","SMRA",
     "BKSL","EMDE","DMAS","GPRA","PPRO",
-    "CITY","APLN","DILD","LPKR",
-    "BUVA",
+    "CITY","APLN","DILD","LPKR","BUVA",
 
     # ===== INFRA / TRANSPORT =====
     "JSMR","EXCL","ISAT","MTEL",
     "ASSA","WEHA","JARR",
-    "CSIS","IKBI","PSSI","VKTR",
+    "CSIS","IKBI","VKTR",
     "KBLV","FWCT","RMKE","MMLP",
     "WIKA","WSKT","PTPP","ADHI","WEGE",
-    "SMDR","TMAS","IPCM",
+    "SMDR","TMAS","IPCM","SPTO",
 
     # ===== TECH / DIGITAL =====
     "GOTO","BUKA","DCII","MCAS","WIFI",
@@ -63,14 +57,20 @@ SAHAM_LIST = [
     "PACK","OPMS","MTRA","TRJA",
     "UNTR","SMSM","SRTG","AALI","LSIP","AUTO","IMAS",
 
-    # ===== SMALL CAP / MOMENTUM / SPECULATIVE =====
+    # ===== DIVIDEND / INCOME FOCUS =====
+    "CEKA","DSNG","TAPG","SSMS",
+
+    # ===== SMALL CAP / MOMENTUM =====
     "RATU","WOWS","HELI","MARK",
     "SUPA","REAL","BKDP","RLCO","POLY",
     "PANI","SOCI","COCO","BIRD","BUAH",
     "KRYA","GJTL","BUMI",
     "TRIM","ZATA","FREN","IBST","LEAD",
 
-    # ===== TOP GAINER / GORENGAN AKTIF =====
+    # ===== HIGH DIVIDEND / CYCLICAL BOOSTER =====
+    "TEBE","KKGI","BSSR","MBAP",
+
+    # ===== TOP GAINER / GORENGAN =====
     "LAJU","STAR","BOGA","AGII","TAYS",
     "PSKT","TOOL","NETV","CASH","MPRO",
     "NUSA","YELO","PURI","GAMA","MEJA",

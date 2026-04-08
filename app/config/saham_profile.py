@@ -254,6 +254,28 @@ SAHAM_PROFILE = {
     # COAL / ENERGY TRADING
     # ==============================
     "CINT": "Chitose Internasional Tbk",
-    "GOLD": "Visi Telekomunikasi Infrastruktur Tbk"
+    "GOLD": "Visi Telekomunikasi Infrastruktur Tbk",
 
+
+    # ==============================
+    # ADDITIONAL (DIVIDEND / MISSING)
+    # ==============================
+    "TEBE": "TBS Energi Utama Tbk (kode alternatif / referensi kecil, cek ulang di IDX)",
+    "CEKA": "Wilmar Cahaya Indonesia Tbk",
+    "DSNG": "Dharma Satya Nusantara Tbk",
+    "TAPG": "Triputra Agro Persada Tbk",
+    "SSMS": "Sawit Sumbermas Sarana Tbk",
+
+    # ==============================
+    # CONSUMER ADDITIONAL
+    # ==============================
+    "HMSP": "Hanjaya Mandala Sampoerna Tbk",
+    "GGRM": "Gudang Garam Tbk",
+    "TCID": "Mandom Indonesia Tbk",
+    "WIIM": "Wismilak Inti Makmur Tbk",
+
+    # ==============================
+    # INFRA / LOGISTIC ADDITIONAL
+    # ==============================
+    "SPTO": "Surya Semesta Internusa Tbk"
 }

@@ -14,7 +14,7 @@ DIVIDEND_LIST = [
     "INDY","MEDC","AKRA","ELSA","RAJA","PTRO",
     "ANTM","TINS","TOBA","ABMM",
     "KKGI","ARCI","NICL","NCKL",
-    "BYAN","ADMR",
+    "BYAN","ADMR","TEBE",
 
     # ===== INDUSTRIAL / AUTOMOTIVE =====
     "ASII","AUTO","IMAS","GJTL","SMSM","UNTR",
@@ -44,4 +44,19 @@ DIVIDEND_LIST = [
 
     # ===== SPECIAL CASE (KADANG BAGI BESAR) =====
     "MDKA","BREN","CUAN"
+
+    # ===== ADDITIONAL DIVIDEND (MISSING) =====
+    "CEKA","DSNG","TAPG","SSMS",
+
+    # ===== CONSUMER HIGH DIVIDEND =====
+    "HMSP","GGRM","TCID","WIIM",
+
+    # ===== LOGISTIC / INFRA DIVIDEND =====
+    "SPTO","RMKE",
+
+    # ===== EXTRA CYCLICAL DIVIDEND =====
+    "DOID","TOBA","ABMM",
+
+    # ===== SMALL HIGH YIELD / NICHE =====
+    "KKGI","BSSR","MBAP"
 ]

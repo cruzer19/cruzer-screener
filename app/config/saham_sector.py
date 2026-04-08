@@ -268,4 +268,25 @@ SAHAM_SECTOR = {
     "RUIS": "ENERGY",
     "KOPI": "ENERGY",
 
+    # ==============================
+    # ADDITIONAL (DIVIDEND / MISSING)
+    # ==============================
+    "TEBE": "MINING",   # asumsi coal kecil / energi
+    "CEKA": "CONSUMER",
+    "DSNG": "AGRI",
+    "TAPG": "AGRI",
+    "SSMS": "AGRI",
+
+    # ==============================
+    # CONSUMER ADDITIONAL
+    # ==============================
+    "HMSP": "CONSUMER",
+    "GGRM": "CONSUMER",
+    "TCID": "CONSUMER",
+    "WIIM": "CONSUMER",
+
+    # ==============================
+    # INFRA / LOGISTIC ADDITIONAL
+    # ==============================
+    "SPTO": "INFRA",
 }
