@@ -1,62 +1,25 @@
 DIVIDEND_LIST = [
 
-    # ===== BIG BANK =====
-    "BBCA","BBRI","BMRI","BBNI","BRIS",
-    "BTPS","BNGA","BBTN","NISP",
-    "BJBR","BJTM","MEGA","PNBN",
-
-    # ===== TELCO / TOWER =====
-    "TLKM","EXCL","ISAT","MTEL",
-    "IBST",
-
-    # ===== ENERGY / MINING (DIVIDEND HEAVY) =====
-    "ADRO","ITMG","PTBA","GEMS","BSSR","MBAP","HRUM",
-    "INDY","MEDC","AKRA","ELSA","RAJA","PTRO",
-    "ANTM","TINS","TOBA","ABMM",
-    "KKGI","ARCI","NICL","NCKL",
-    "BYAN","ADMR","TEBE",
-
-    # ===== INDUSTRIAL / AUTOMOTIVE =====
-    "ASII","AUTO","IMAS","GJTL","SMSM","UNTR",
-
-    # ===== CONSUMER STABLE =====
-    "ICBP","INDF","MYOR","ULTJ","KLBF",
-    "UNVR","SMAR","CLEO",
-    "SIDO","ROTI","GOOD","HOKI",
-
-    # ===== RETAIL (SEMI CONSISTENT) =====
-    "ACES","ERAA","RALS","LPPF","AMRT","MAPI","MAPA",
-
-    # ===== INFRA / UTILITIES =====
-    "PGAS","JSMR","SMGR","INTP",
-    "ASSA","KBLV",
-    "IPCM","SMDR","TMAS",
-
-    # ===== PROPERTY (DIVIDEN PERIODIK) =====
-    "CTRA","BSDE","PWON","SMRA","DMAS",
-    "LPKR","ASRI",
-
-    # ===== ENERGY TRANSITION / UTILITIES =====
-    "ESSA","PGEO","KEEN",
-
-    # ===== CHEMICAL / HOLDING =====
-    "TPIA","BRPT","SRTG",
-
-    # ===== SPECIAL CASE (KADANG BAGI BESAR) =====
-    "MDKA","BREN","CUAN"
-
-    # ===== ADDITIONAL DIVIDEND (MISSING) =====
-    "CEKA","DSNG","TAPG","SSMS",
-
-    # ===== CONSUMER HIGH DIVIDEND =====
-    "HMSP","GGRM","TCID","WIIM",
-
-    # ===== LOGISTIC / INFRA DIVIDEND =====
-    "SPTO","RMKE",
-
-    # ===== EXTRA CYCLICAL DIVIDEND =====
-    "DOID","TOBA","ABMM",
-
-    # ===== SMALL HIGH YIELD / NICHE =====
-    "KKGI","BSSR","MBAP"
+    "AADI", "AALI", "ABMM", "ACES", "ACRO", "ADMF", "ADMR", "ADRO", "AKRA", "AMAG", 
+    "AMAR", "AMIN", "AMOR", "AMRT", "ANTM", "ARCI", "ARNA", "ASDM", "ASGR", "ASII", 
+    "ASRI", "ASSA", "AUTO", "AVIA", "AXIO", "BALI", "BAYU", "BBCA", "BBNI", "BBRI", 
+    "BBTN", "BDMN", "BFIN", "BIRD", "BISI", "BJBR", "BJTM", "BMRI", "BNGA", "BOBA", 
+    "BPFI", "BREN", "BRIS", "BRPT", "BSDE", "BSSR", "BTPS", "BUAH", "BUDI", "BYAN", 
+    "CEKA", "CFIN", "CINT", "CITA", "CLEO", "CLPI", "CMRY", "CNMA", "CTBN", "CTRA", 
+    "CUAN", "DAAZ", "DGWG", "DKFT", "DLTA", "DMAS", "DOID", "DRMA", "DSNG", "DVLA", 
+    "EAST", "EKAD", "ELSA", "EMTK", "EPMT", "ERAA", "ESSA", "EXCL", "FWCT", "GEMA", 
+    "GEMS", "GGRM", "GHON", "GJTL", "GLVA", "GOOD", "GPRA", "GUNA", "HAIS", "HEXA", 
+    "HMSP", "HOKI", "HRUM", "ICBP", "IFII", "IKBI", "IMAS", "INCI", "INDF", "INDY", 
+    "INTP", "IPCM", "ISAT", "ISSP", "ITMG", "JAYA", "JKON", "JSMR", "KBLI", "KBLM", 
+    "KBLV", "KDSI", "KEEN", "KKGI", "KLBF", "KMDS", "LPIN", "LPKR", "LPPF", "LSIP", 
+    "LTLS", "MAHA", "MAIN", "MAPA", "MAPI", "MARK", "MBAP", "MCOL", "MDKA", "MDKI", 
+    "MDLA", "MEDC", "MEGA", "MERK", "MKPI", "MLBI", "MMLP", "MPMX", "MSTI", "MTDL", 
+    "MTEL", "MYOH", "MYOR", "NCKL", "NICL", "NISP", "NRCA", "OBAT", "PANR", "PANS", 
+    "PBID", "PBSA", "PGAS", "PGEO", "PJAA", "PNBN", "PNGO", "POWR", "PPGL", "PRDA", 
+    "PSGO", "PTBA", "PTPS", "PTRO", "PWON", "RAJA", "RALS", "RMKE", "ROTI", "SAMF", 
+    "SBMA", "SCCO", "SCMA", "SDRA", "SGRO", "SICO", "SIDO", "SKLT", "SKRN", "SMAR", 
+    "SMDR", "SMGR", "SMRA", "SMSM", "SPTO", "SRTG", "SSMS", "STAA", "SUNI", "TAPG", 
+    "TBMS", "TCID", "TEBE", "TGKA", "TIFA", "TINS", "TLDN", "TLKM", "TMAS", "TOBA", 
+    "TOTL", "TOTO", "TOWR", "TPIA", "TPMA", "TRIS", "TRUS", "TSPC", "TUGU", "UCID", 
+    "ULTJ", "UNIC", "UNTD", "UNTR", "UNVR", "WEHA", "WIIM", "WOMF", "YUPI", 
 ]
