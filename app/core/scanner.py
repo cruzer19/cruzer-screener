@@ -7,6 +7,9 @@ from app.services.data import get_price_data
 from app.services.logic import detect_day_trade, detect_market_mover
 from app.services.telegram_bot import send_message
 
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 
 def scan_day(state=None):
 
@@ -96,7 +99,7 @@ def scan_day(state=None):
             # ================= MESSAGE =================
             if alert_type and key not in alerted:
 
-                now = datetime.now().strftime("%d %b %Y %H:%M:%S")
+                now = datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%d %b %Y %H:%M:%S")
                 entry_range = f"{entry_low or '-'} - {entry_high or '-'}"
                 sl = sl or "-"
 

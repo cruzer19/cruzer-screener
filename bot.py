@@ -3,9 +3,16 @@ load_dotenv()
 
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, time as dtime
+from zoneinfo import ZoneInfo
 
 from app.core.scanner import scan_day
+
+
+# ==========================================================
+# ===================== CONFIG TIMEZONE =====================
+# ==========================================================
+TZ = ZoneInfo("Asia/Jakarta")
 
 
 # ==========================================================
@@ -29,16 +36,16 @@ INTERVAL = 180  # scan setiap 3 menit
 # ==========================================================
 def is_market_open():
 
-    now = datetime.now().time()
+    now = datetime.now(TZ).time()
 
     morning_open = (
-        now >= datetime.strptime("09:00", "%H:%M").time() and
-        now <= datetime.strptime("12:00", "%H:%M").time()
+        now >= dtime(9, 0) and
+        now <= dtime(12, 0)
     )
 
     afternoon_open = (
-        now >= datetime.strptime("13:30", "%H:%M").time() and
-        now <= datetime.strptime("16:00", "%H:%M").time()
+        now >= dtime(13, 30) and
+        now <= dtime(16, 0)
     )
 
     return morning_open or afternoon_open
@@ -55,14 +62,14 @@ def run_bot():
     state = {
         "alerted": {},
         "last_status": {},
-        "date": datetime.now().date()
+        "date": datetime.now(TZ).date()
     }
 
     while True:
 
         try:
 
-            now = datetime.now()
+            now = datetime.now(TZ)
 
             # ================= RESET DAILY =================
             if now.date() != state["date"]:
@@ -102,7 +109,6 @@ def run_bot():
             print("❌ BOT ERROR:", e)
             logging.error(f"BOT ERROR: {e}")
 
-            # sleep sebentar supaya tidak looping error
             time.sleep(30)
 
         time.sleep(INTERVAL)
