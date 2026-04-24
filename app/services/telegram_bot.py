@@ -46,7 +46,8 @@ def send_message(text: str):
     chat_id = os.getenv("TELEGRAM_CHAT_ID")
 
     if not token or not chat_id:
-        raise RuntimeError("Telegram token / chat_id belum diset")
+        print("⚠️ Telegram config missing")
+        return
 
     if not text:
         raise ValueError("Telegram message is empty")

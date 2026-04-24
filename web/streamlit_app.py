@@ -28,6 +28,9 @@ from app.config.saham_profile import SAHAM_PROFILE
 from app.config.dividend_list import DIVIDEND_LIST
 from app.renderers.telegram import render_telegram
 from app.services.telegram_bot import send_message
+from app.services.logic import round_price
+from app.services.logic import detect_day_trade, detect_market_mover
+from app.services.data import get_price_data
 from app.utils.news_engine import fetch_stock_news
 
 from app.tracker.tracker import (
@@ -463,282 +466,318 @@ def render_dividend_screener():
         st.markdown("---")
 
 # ==========================================================
-# ======================= SCREENER =========================
+# ===================== IMPORT ==============================
 # ==========================================================
-def render_screener():
-    SCREENER_LABEL_MAP = {
-        "Swing Trade (Week)": "swing_trade_week",
-        "Swing Trade (Day)": "swing_trade_day",
-        "Breakout (BSJP)": "breakout",
-    }
+import os
+import streamlit as st
+import pandas as pd
+import requests
+from datetime import datetime
 
-    # MAP ENGINE MODE → TELEGRAM SETUP LABEL (dipertahankan untuk kompatibilitas lama)
-    SETUP_LABEL_MAP = {
-        "swing_trade_week": "Swing Setup (Week)",
-        "swing_trade_day": "Swing Setup (Day)",
-        "breakout": "BSJP Setup",
-    }
+from app.config.saham_list import SAHAM_LIST
+from app.core.scanner import scan_day
+from app.core.engine import ScreenerEngine
 
-    SCREENER_GUIDE = {
-        "swing_trade_day": """
-🟡 **Swing Trade DAY** 
+# 🔥 FIX YFINANCE ERROR
+os.environ["YFINANCE_NO_SQLITE"] = "1"
 
-• Target: 1–3% 
 
-• Timeframe: Intraday 
+# ==========================================================
+# ===================== TELEGRAM ============================
+# ==========================================================
+def send_telegram(msg):
 
-• Cocok saat market aktif 
+    bot_token = st.secrets.get("TELEGRAM_BOT_TOKEN")
+    chat_id = st.secrets.get("TELEGRAM_CHAT_ID")
 
-• Entry: Pagi / entry zone 
-
-• Exit: Sore hari
-""",
-        "swing_trade_week": """
-🟢 **Swing Trade WEEK** 
-
-• Target: 5–15% 
-
-• Timeframe: Beberapa hari 
-
-• Cocok saat market sideways sehat 
-
-• Entry: Entry zone / Pullback 
-
-• Exit: Bertahap
-""",
-        "breakout": """
-🔴 **Breakout (BSJP)** 
-
-• Target: Follow-through cepat 
-
-• Timeframe: Sore → pagi 
-
-• Entry: 14.45–15.00 WIB 
-
-• Exit: Gap up / resistance berikutnya
-""",
-    }
-
-    # ===== INIT SESSION STATE =====
-    for key, default in {
-        "min_score": 50,
-        "min_gain": 2,
-        "price_range": (0, 10_000),
-        "last_screener": None,
-        "scanned_screener": None,
-    }.items():
-        if key not in st.session_state:
-            st.session_state[key] = default
-
-    # ===== SIDEBAR =====
-    st.sidebar.header("⚙️ Screener Settings")
-
-    screener_label = st.sidebar.selectbox(
-        "Pilih Tipe Screener",
-        options=list(SCREENER_LABEL_MAP.keys()),
-    )
-    screener_type = SCREENER_LABEL_MAP[screener_label]
-
-    with st.expander("ℹ️ Panduan Penggunaan Screener"):
-        st.markdown(SCREENER_GUIDE[screener_type])
-
-    # reset hasil jika ganti screener
-    if st.session_state.last_screener != screener_type:
-        st.session_state.pop("results", None)
-        st.session_state.scanned_screener = None
-        st.session_state.last_screener = screener_type
-
-    st.session_state.min_score = st.sidebar.slider(
-        "Minimum Score", 0, 100, st.session_state.min_score
-    )
-    st.session_state.min_gain = st.sidebar.slider(
-        "Minimum Expected Gain (%)", 0, 15, st.session_state.min_gain
-    )
-    st.session_state.price_range = st.sidebar.slider(
-        "Filter Harga (Rp)",
-        0,
-        30_000,
-        st.session_state.price_range,
-        step=500,
-    )
-
-    min_score = st.session_state.min_score
-    min_gain = st.session_state.min_gain
-    min_price, max_price = st.session_state.price_range
-
-    # ================= SCAN =================
-    if st.button("🔍 Scan Market", use_container_width=True):
-        with st.spinner("🔍 Scanning market... Mohon tunggu"):
-            engine = ScreenerEngine()
-            st.session_state["results"] = engine.run(SAHAM_LIST, screener_type)
-            st.session_state.scanned_screener = screener_type
-
-        st.success("✅ Scan market selesai")
-
-    # ================= DISPLAY =================
-    if not (
-        "results" in st.session_state
-        and st.session_state.scanned_screener == screener_type
-    ):
+    if not bot_token or not chat_id:
         return
 
-    entry_now, watchlist = [], []
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
 
-    for r in st.session_state["results"]:
-        last_price = float(r.last_price)
-        gain_pct = (r.tp[1] - last_price) / last_price * 100
+    try:
+        requests.post(
+            url,
+            json={
+                "chat_id": chat_id,
+                "text": msg,
+                "parse_mode": "HTML",
+                "disable_web_page_preview": True
+            },
+            timeout=10
+        )
+    except:
+        pass
 
-        # GLOBAL FILTER
-        if not (min_price <= last_price <= max_price):
+# ==========================================================
+# ===================== WEEK ================================
+# ==========================================================
+def format_rsi_status(status):
+
+    if not status:
+        return "⚪ Normal"
+
+    if "Oversold" in status:
+        return "🟢 Oversold"
+
+    elif "Overbought" in status:
+        return "🔴 Overbought"
+
+    else:
+        return "⚪ Normal"
+
+
+def scan_week(min_price=None, max_price=None):
+
+    engine = ScreenerEngine()
+    results = engine.run(SAHAM_LIST, "swing_trade_week")
+
+    rows = []
+
+    for r in results:
+
+        if r is None:
             continue
-        if r.score < min_score:
-            continue
-        if gain_pct < min_gain:
+
+        try:
+
+            last_price = float(r.last_price)
+            rsi_val = float(r.rsi_value) if r.rsi_value else 50
+
+            entry_low = float(r.entry_low)
+            entry_high = float(r.entry_high)
+
+            trend = r.score_breakdown.get("Trend", 0) if r.score_breakdown else 0
+            volume = r.score_breakdown.get("Volume", 0) if r.score_breakdown else 0
+
+            # 🔥 BAND ACCUMULATION (NEW)
+            band = getattr(r, "band_accumulation", 0)
+
+            gain_pct = (r.tp[1] - last_price) / last_price * 100
+
+            # ================= BASIC FILTER =================
+            if volume <= 0 or trend <= 0:
+                continue
+
+            if r.score < 50:
+                continue
+
+            if last_price > entry_high * 1.01:
+                continue
+
+            # ================= SETUP =================
+            if rsi_val <= 45 and trend >= 20:
+                setup = "🔥 Best Entry"
+                setup_score = 3
+
+            elif 45 < rsi_val <= 60:
+                setup = "🟡 Pullback"
+                setup_score = 2
+
+            elif rsi_val > 60 and trend >= 20:
+                setup = "🚀 Breakout"
+                setup_score = 1
+
+            else:
+                continue
+
+            # ================= ENTRY LOGIC =================
+            in_entry = entry_low <= last_price <= entry_high
+
+            near_entry = (
+                last_price < entry_low and
+                (entry_low - last_price) / entry_low <= 0.03
+            )
+
+            entry_ready = in_entry or near_entry
+
+            # ================= ENTRY SCORE =================
+            if in_entry:
+                entry_score = 30
+            elif near_entry:
+                entry_score = 15
+            else:
+                entry_score = 0
+
+            # ================= DISTANCE PENALTY =================
+            distance = abs(last_price - entry_low) / entry_low
+            distance_penalty = distance * 50
+
+            # ================= FINAL RANK =================
+            final_rank = (
+                setup_score * 40 +
+                entry_score +
+                volume * 2 +
+                trend * 1.5 +
+                band * 15 +      # 🔥 BAND ACCUMULATION BOOST
+                r.score * 0.5
+            )
+
+            final_rank -= distance_penalty
+
+            if not entry_ready:
+                final_rank -= 20
+
+            rows.append({
+                "Kode": r.kode,
+                "Harga": int(last_price),
+                "Score": int(r.score),
+
+                "Setup": setup,
+                "Trend": trend,
+
+                "RSI Value": round(rsi_val, 2),
+                "RSI Status": format_rsi_status(r.rsi_status),
+
+                "Volume": volume,
+                "Band": band,  # 🔥 new column
+
+                "Near Entry": entry_ready,
+
+                "Entry": f"{int(entry_low)} - {int(entry_high)}",
+                "TP": f"{int(r.tp[0])} / {int(r.tp[1])}",
+                "SL": int(r.sl),
+
+                "Gain (%)": round(gain_pct, 2),
+                "Rank": final_rank
+            })
+
+        except Exception as e:
+            print("ERROR PARSING:", r.kode, e)
             continue
 
-        pos = price_position(last_price, r.entry_low, r.entry_high)
-        trend_score = r.score_breakdown.get("Trend", 0)
-        volume_score = r.score_breakdown.get("Volume", 0)
+    df = pd.DataFrame(rows)
 
-        row = {
-            "Kode": r.kode,
-            "Harga": int(last_price),
-            "Score": r.score,
-            "Trend": trend_score,
-            "RSI": r.score_breakdown.get("RSI", 0),
-            "Volume": volume_score,
-            "Entry": format_range(r.entry_low, r.entry_high),
-            "TP": format_tp(r.tp),
-            "SL": format_price(r.sl),
-            "Gain (%)": f"{gain_pct:.2f}",
+    if df.empty:
+        return df, df
+
+    # ================= FILTER HARGA =================
+    if min_price is not None and max_price is not None:
+        df = df[(df["Harga"] >= min_price) & (df["Harga"] <= max_price)]
+
+    # ================= SPLIT =================
+    df_pullback = df[df["Setup"].isin(["🔥 Best Entry", "🟡 Pullback"])].copy()
+    df_oversold = df[df["RSI Status"].str.contains("Oversold")].copy()
+
+    df_oversold = df_oversold[~df_oversold["Kode"].isin(df_pullback["Kode"])]
+
+    # ================= SORTING =================
+    if not df_pullback.empty:
+        df_pullback = (
+            df_pullback
+            .sort_values(
+                by=["Rank", "Near Entry", "Volume", "Score"],
+                ascending=[False, False, False, False]
+            )
+            .head(10)
+            .reset_index(drop=True)
+        )
+        df_pullback.index += 1
+
+    if not df_oversold.empty:
+        df_oversold = (
+            df_oversold
+            .sort_values(
+                by=["Rank", "Volume"],
+                ascending=[False, False]
+            )
+            .head(10)
+            .reset_index(drop=True)
+        )
+        df_oversold.index += 1
+
+    # ================= CLEAN TABLE =================
+    df_pullback = df_pullback.drop(columns=["Rank"], errors="ignore")
+    df_oversold = df_oversold.drop(columns=["Rank"], errors="ignore")
+
+    return df_pullback, df_oversold
+
+# ==========================================================
+# ===================== MAIN UI =============================
+# ==========================================================
+def render_screener():
+
+    st.header("📊 CRUZER AI - SCREENER")
+
+    if st.button("Reset Scanner"):
+        st.session_state["scanner_state"] = {
+            "alerted": {},
+            "last_status": {}
         }
 
-        if screener_type == "breakout":
-            if (
-                r.score >= min_score
-                and trend_score >= 20
-                and volume_score >= 10
-                and near_resistance(last_price, r.entry_high)
-            ):
-                entry_now.append(row)
-            else:
-                watchlist.append(row)
+        st.success("Scanner berhasil di-reset")
 
-        elif screener_type == "swing_trade_day":
-            if (
-                r.score >= min_score
-                and gain_pct >= min_gain
-                and (pos == "INSIDE" or near_entry(last_price, r.entry_high))
-            ):
-                entry_now.append(row)
-            else:
-                watchlist.append(row)
-
-        else:
-            if pos == "INSIDE" and r.score >= min_score and gain_pct >= min_gain:
-                entry_now.append(row)
-            else:
-                watchlist.append(row)
-
-    # ================= RENDER CAN ENTRY =================
-    st.subheader("🟢 CAN ENTRY")
-
-    df_entry = pd.DataFrame(entry_now)
-
-    if df_entry.empty:
-        st.info(
-            "📭 Belum ada saham yang memenuhi kriteria **CAN ENTRY**.\n\n"
-            "📌 Tunggu konfirmasi harga / volume, atau sesuaikan parameter screener."
-        )
-    else:
-        df_entry = (
-            df_entry.sort_values(by=["Score", "Harga"], ascending=[False, False])
-            .reset_index(drop=True)
-            .head(15)
-        )
-        df_entry.index = df_entry.index + 1
-        render_df(df_entry)
-
-    # ===== BUTTON TELEGRAM (SETELAH TABEL) =====
-    st.subheader("📤 Share CAN ENTRY")
-
-    # ambil password (secrets → env fallback)
-    def get_share_password():
-        try:
-            return st.secrets.get("SHARE_PASSWORD")
-        except Exception:
-            return os.getenv("SHARE_PASSWORD")
-
-    SHARE_PASSWORD = get_share_password()
-
-    input_pwd = st.text_input(
-        "🔐 Password untuk kirim CAN ENTRY",
-        type="password",
-        key="share_pwd_can_entry",
+    screener_type = st.selectbox(
+        "Pilih Tipe",
+        ["Swing Trade (Day)", "Swing Trade (Week)"]
     )
 
-    # cek apakah ada CAN ENTRY
-    has_entry = len(entry_now) > 0
+    if "scanner_state" not in st.session_state:
+        st.session_state["scanner_state"] = {
+            "alerted": {},
+            "last_status": {}
+        }
 
-    is_authorized = input_pwd == SHARE_PASSWORD and has_entry
+    if st.button("🚀 Scan Market", use_container_width=True):
 
-    if st.button(
-        "📩 Send CAN ENTRY to Telegram",
-        type="primary",
-        use_container_width=True,
-        key="btn_send_can_entry_telegram",
-        disabled=not is_authorized,
-    ):
-        bot_token = (
-            st.secrets.get("TELEGRAM_BOT_TOKEN", None)
-            if hasattr(st, "secrets")
-            else None
-        ) or os.getenv("TELEGRAM_BOT_TOKEN")
+        with st.spinner("Scanning market..."):
 
-        chat_id = (
-            st.secrets.get("TELEGRAM_CHAT_ID", None)
-            if hasattr(st, "secrets")
-            else None
-        ) or os.getenv("TELEGRAM_CHAT_ID")
+            if screener_type == "Swing Trade (Day)":
 
-        if not bot_token or not chat_id:
-            st.error("Telegram belum dikonfigurasi (Secrets / ENV belum ada)")
+                df, alerts, state = scan_day(st.session_state["scanner_state"])
+
+                st.session_state["scanner_state"] = state
+                st.session_state["mode"] = "day"
+                st.session_state["data"] = df
+
+            else:
+
+                df_pullback, df_oversold = scan_week()
+
+                st.session_state["mode"] = "week"
+                st.session_state["pullback"] = df_pullback
+                st.session_state["oversold"] = df_oversold
+
+            st.session_state["time"] = datetime.now().strftime("%d %b %H:%M:%S")
+
+    # ================= DISPLAY =================
+    if "mode" not in st.session_state:
+        return
+
+    st.caption(f"⏱ Last Scan: {st.session_state.get('time','-')}")
+
+    # ================= DAY =================
+    if st.session_state["mode"] == "day":
+
+        df = st.session_state["data"]
+
+        if df.empty:
+            st.warning("📭 Tidak ada data")
         else:
-            try:
-                message = render_telegram(results=entry_now)
-                send_message(message)
-                st.success("CAN ENTRY terkirim ke Telegram ✅")
-            except Exception as e:
-                st.error("❌ Gagal kirim ke Telegram")
-                st.code(str(e))
+            st.dataframe(df, use_container_width=True)
 
-
-    if not has_entry:
-        st.info("📭 Tidak ada CAN ENTRY untuk dikirim ke Telegram.")
-
-    elif input_pwd and input_pwd != SHARE_PASSWORD:
-        st.error("❌ Password salah")
-
-
-    # ================= RENDER WATCHLIST =================
-    st.subheader("🟡 WATCHLIST")
-
-    df_watchlist = pd.DataFrame(watchlist)
-
-    if df_watchlist.empty:
-        st.info(
-            "📭 Tidak ada saham yang masuk **WATCHLIST** saat ini.\n\n"
-            "ℹ️ Biasanya terjadi saat market sepi atau filter cukup ketat."
-        )
+    # ================= WEEK =================
     else:
-        df_watchlist = (
-            df_watchlist.sort_values(by=["Score", "Harga"], ascending=[False, False])
-            .reset_index(drop=True)
-            .head(15)  # 🔥 LIMIT DI SINI
-        )
-        df_watchlist.index = df_watchlist.index + 1
-        render_df(df_watchlist)
 
+        st.subheader("🔥 BEST PULLBACK (WEEK)")
+
+        df_pullback = st.session_state.get("pullback", pd.DataFrame())
+
+        if df_pullback.empty:
+            st.warning("📭 Tidak ada pullback bagus")
+        else:
+            st.dataframe(df_pullback, use_container_width=True)
+
+        st.divider()
+
+        st.subheader("🔵 OVERSOLD REVERSAL (WEEK)")
+
+        df_oversold = st.session_state.get("oversold", pd.DataFrame())
+
+        if df_oversold.empty:
+            st.info("Tidak ada saham oversold")
+        else:
+            st.dataframe(df_oversold, use_container_width=True)
 
 # ==========================================================
 # =================== STOCK ANALYSIS =======================
@@ -1108,217 +1147,6 @@ def render_stock_analysis():
     )
 
     st.table(entry_df.set_index("Parameter"))
-
-    # # ===================== GAP INSIGHT FINAL =====================
-    # st.markdown("---")
-
-    # from datetime import datetime
-
-    # df = df_price.copy()
-
-    # # ===== FIX COLUMN =====
-    # if isinstance(df.columns, pd.MultiIndex):
-    #     df.columns = [c[0] for c in df.columns]
-
-    # df.columns = [str(c).upper().strip() for c in df.columns]
-
-    # # ===== VALIDATION =====
-    # required = ["OPEN", "HIGH", "LOW", "CLOSE"]
-    # missing = [c for c in required if c not in df.columns]
-
-    # if missing:
-    #     st.error(f"Kolom tidak ditemukan: {missing}")
-    # else:
-    #     if len(df) < 5:
-    #         st.warning("Data belum cukup")
-    #     else:
-
-    #         # ===================== LIMIT DATA (PENTING) =====================
-    #         df = df.tail(60)
-
-    #         gap_list = []
-
-    #         # ===================== DETECT GAP =====================
-    #         for i in range(1, len(df)):
-    #             prev = df.iloc[i - 1]
-    #             curr = df.iloc[i]
-
-    #             date = df.index[i]
-
-    #             if isinstance(date, pd.Timestamp):
-    #                 date_str = date.strftime("%d-%m-%Y")
-    #                 date_obj = date.to_pydatetime()
-    #             else:
-    #                 date_str = str(date)
-    #                 date_obj = datetime.now()
-
-    #             # GAP UP
-    #             if curr["OPEN"] > prev["HIGH"]:
-    #                 gap_size = curr["OPEN"] - prev["HIGH"]
-    #                 gap_pct = (gap_size / prev["HIGH"]) * 100
-
-    #                 gap_list.append({
-    #                     "type": "UP",
-    #                     "low": int(prev["HIGH"]),
-    #                     "high": int(curr["OPEN"]),
-    #                     "date": date_str,
-    #                     "date_obj": date_obj,
-    #                     "pct": gap_pct
-    #                 })
-
-    #             # GAP DOWN
-    #             elif curr["OPEN"] < prev["LOW"]:
-    #                 gap_size = prev["LOW"] - curr["OPEN"]
-    #                 gap_pct = (gap_size / prev["LOW"]) * 100
-
-    #                 gap_list.append({
-    #                     "type": "DOWN",
-    #                     "low": int(curr["OPEN"]),
-    #                     "high": int(prev["LOW"]),
-    #                     "date": date_str,
-    #                     "date_obj": date_obj,
-    #                     "pct": gap_pct
-    #                 })
-
-    #         # ===================== FILTER GAP TERLALU LAMA =====================
-    #         filtered_gaps = []
-    #         for g in gap_list:
-    #             days_ago = (datetime.now() - g["date_obj"]).days
-    #             if days_ago <= 14:  # hanya 2 minggu terakhir
-    #                 filtered_gaps.append(g)
-
-    #         if not filtered_gaps:
-    #             st.info("Tidak ada gap relevan (≤14 hari)")
-    #         else:
-
-    #             # ===================== SCORING =====================
-    #             def score_gap(g):
-    #                 score = 0
-
-    #                 # SIZE
-    #                 if g["pct"] > 5:
-    #                     score += 3
-    #                 elif g["pct"] > 2:
-    #                     score += 2
-    #                 else:
-    #                     score += 1
-
-    #                 # FRESHNESS
-    #                 days_ago = (datetime.now() - g["date_obj"]).days
-    #                 if days_ago <= 3:
-    #                     score += 3
-    #                 elif days_ago <= 7:
-    #                     score += 2
-    #                 else:
-    #                     score += 1
-
-    #                 return score
-
-    #             for g in filtered_gaps:
-    #                 g["score"] = score_gap(g)
-
-    #             # ===================== SORT =====================
-    #             ranked_gaps = sorted(filtered_gaps, key=lambda x: x["score"], reverse=True)
-    #             top_gaps = ranked_gaps[:3]
-
-    #            # # ===================== DISPLAY GAP ZONES =====================
-    #            #  st.markdown("### 📊 Last 3 Gap Zones")
-
-    #            #  if not filtered_gaps:
-    #            #      st.info("Tidak ada gap terdeteksi")
-    #            #  else:
-
-    #            #      # ===================== CURRENT PRICE =====================
-    #            #      current_price = df_mc["CLOSE"].iloc[-1]
-
-    #            #      # ===================== ENRICH DATA =====================
-    #            #      enriched_gaps = []
-
-    #            #      for g in filtered_gaps:
-
-    #            #          # ===== SIZE SCORE =====
-    #            #          if g["pct"] < 2:
-    #            #              size_score = 1
-    #            #          elif g["pct"] < 5:
-    #            #              size_score = 2
-    #            #          else:
-    #            #              size_score = 3
-
-    #            #          # ===== FRESHNESS SCORE =====
-    #            #          days_ago = (datetime.now() - g["date_obj"]).days
-    #            #          if days_ago <= 3:
-    #            #              fresh_score = 3
-    #            #          elif days_ago <= 7:
-    #            #              fresh_score = 2
-    #            #          else:
-    #            #              fresh_score = 1
-
-    #            #          # ===== PROXIMITY SCORE (NEW 🔥) =====
-    #            #          gap_mid = (g["low"] + g["high"]) / 2
-    #            #          distance_pct = abs(current_price - gap_mid) / gap_mid * 100
-
-    #            #          if distance_pct < 2:
-    #            #              prox_score = 3
-    #            #          elif distance_pct < 5:
-    #            #              prox_score = 2
-    #            #          else:
-    #            #              prox_score = 1
-
-    #            #          # ===== TOTAL SCORE =====
-    #            #          total_score = size_score + fresh_score + prox_score
-
-    #            #          g["size_score"] = size_score
-    #            #          g["fresh_score"] = fresh_score
-    #            #          g["prox_score"] = prox_score
-    #            #          g["distance_pct"] = distance_pct
-    #            #          g["total_score"] = total_score
-
-    #            #          enriched_gaps.append(g)
-
-    #            #      # ===================== FILTER TOP =====================
-    #            #      # ambil gap berkualitas
-    #            #      top_gaps = sorted(
-    #            #          enriched_gaps,
-    #            #          key=lambda x: x["total_score"],
-    #            #          reverse=True
-    #            #      )[:5]  # ambil 5 dulu biar fleksibel
-
-    #            #      # ===================== SORT BY DATE =====================
-    #            #      top_gaps = sorted(
-    #            #          top_gaps,
-    #            #          key=lambda x: x["date_obj"],
-    #            #          reverse=True
-    #            #      )[:3]
-
-    #            #      # ===================== DISPLAY =====================
-    #            #      for i, g in enumerate(top_gaps, 1):
-
-    #            #          emoji = "📈" if g["type"] == "UP" else "📉"
-
-    #            #          # ===== STRENGTH LABEL =====
-    #            #          if g["total_score"] >= 8:
-    #            #              strength = "🔴 STRONG"
-    #            #          elif g["total_score"] >= 6:
-    #            #              strength = "🟡 MEDIUM"
-    #            #          else:
-    #            #              strength = "🟢 WEAK"
-
-    #            #          st.markdown(f"""
-    #            #          **{i}. {emoji} Rp {g['low']:,} - Rp {g['high']:,}**  
-    #            #          📅 {g['date']} • {strength}
-    #            #          """.replace(",", "."))
-
-    #            #      # gap terbaik secara kualitas
-    #            #      best_quality = sorted(enriched_gaps, key=lambda x: x["total_score"], reverse=True)[0]
-
-    #            #      # gap terdekat ke harga sekarang
-    #            #      nearest_gap = sorted(enriched_gaps, key=lambda x: x["distance_pct"])[0]
-
-    #            #      # ===================== EXTRA INSIGHT =====================
-    #            #      st.caption(
-    #            #          f"Gap terdekat: {nearest_gap['date']} "
-    #            #          f"({nearest_gap['distance_pct']:.2f}% dari harga sekarang)"
-    #            #      )
 
     # ===================== SMART MONEY FLOW (FINAL) =====================
     st.subheader("💰 Smart Money Flow (10D)")
@@ -2077,335 +1905,12 @@ def render_manage_data():
                 st.rerun()
 
 # ==========================================================
-# ===================== TRADING BOT ========================
-# ==========================================================
-import streamlit as st
-import yfinance as yf
-import pandas as pd
-from datetime import datetime
-import requests
-
-from app.config.saham_list import SAHAM_LIST
-
-
-# ==========================================================
-# ===================== TELEGRAM ===========================
-# ==========================================================
-def send_telegram(msg):
-
-    bot_token = st.secrets.get("TELEGRAM_BOT_TOKEN")
-    chat_id = st.secrets.get("TELEGRAM_CHAT_ID")
-
-    if not bot_token or not chat_id:
-        return
-
-    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-
-    try:
-        requests.post(url, json={
-            "chat_id": chat_id,
-            "text": msg,
-            "parse_mode": "HTML",
-            "disable_web_page_preview": True
-        }, timeout=10)
-    except:
-        pass
-
-
-# ==========================================================
-# ===================== PRICE DATA =========================
-# ==========================================================
-@st.cache_data(ttl=30)
-def get_price_data(ticker):
-
-    try:
-        df = yf.download(f"{ticker}.JK", period="1d", interval="5m", progress=False)
-
-        if df is None or df.empty:
-            df = yf.download(f"{ticker}.JK", period="5d", interval="15m", progress=False)
-
-        if df is None or df.empty:
-            df = yf.download(f"{ticker}.JK", period="1mo", interval="1d", progress=False)
-
-        if df is None or df.empty:
-            return None
-
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = [col[0] for col in df.columns]
-
-        df.columns = [str(c).upper().strip() for c in df.columns]
-
-        df = df.rename(columns={"ADJ CLOSE": "CLOSE"})
-
-        required = ["CLOSE", "HIGH", "LOW", "VOLUME"]
-        for col in required:
-            if col not in df.columns:
-                return None
-
-        return df.dropna()
-
-    except:
-        return None
-
-
-# ==========================================================
-# ===================== TICK SIZE ==========================
-# ==========================================================
-def round_price(price):
-
-    if price < 200:
-        tick = 1
-    elif price < 500:
-        tick = 2
-    elif price < 2000:
-        tick = 5
-    elif price < 5000:
-        tick = 10
-    else:
-        tick = 25
-
-    return int(round(price / tick) * tick)
-
-
-# ==========================================================
-# ===================== DETECTOR ===========================
-# ==========================================================
-def detect_setup(df):
-
-    if df is None or len(df) < 30:
-        return None
-
-    close = df["CLOSE"]
-    high = df["HIGH"]
-    low = df["LOW"]
-    volume = df["VOLUME"]
-
-    price = close.iloc[-1]
-
-    recent_high = high.tail(15).max()
-    recent_low = low.tail(15).min()
-
-    # ENTRY & SL
-    entry = round_price(recent_high * 1.01)
-    sl = round_price(max(recent_low, entry * 0.95))
-
-    # SCORE
-    avg_vol = volume.iloc[-30:-10].mean()
-    recent_vol = volume.iloc[-10:].mean()
-    vol_ratio = recent_vol / avg_vol if avg_vol > 0 else 1
-
-    momentum = (price - close.iloc[-5]) / close.iloc[-5] * 100
-    up_count = (close.diff() > 0).tail(10).sum()
-
-    score = (
-        min(vol_ratio * 30, 40) +
-        up_count * 2 +
-        max(0, momentum * 2)
-    )
-
-    # CLASS
-    if price >= recent_high:
-        status = "🔥 Breakout"
-    elif recent_high * 0.95 <= price < recent_high:
-        status = "⚡ Pre-Breakout"
-    elif price <= recent_low:
-        status = "🟢 Pullback"
-    else:
-        status = "⚠️ Mid"
-
-    return {
-        "price": round_price(price),
-        "entry": entry,
-        "sl": sl,
-        "score": round(score, 1),
-        "status": status
-    }
-
-
-# ==========================================================
-# ===================== SCAN ===============================
-# ==========================================================
-def run_scan():
-
-    results = []
-    alerts = []
-
-    if "alerted" not in st.session_state:
-        st.session_state["alerted"] = {}
-
-    if "last_status" not in st.session_state:
-        st.session_state["last_status"] = {}
-
-    scan_time = datetime.now().strftime("%d %b %Y %H:%M:%S")
-
-    for ticker in SAHAM_LIST:
-
-        df = get_price_data(ticker)
-        if df is None or df.empty:
-            continue
-
-        data = detect_setup(df)
-        if not data:
-            continue
-
-        status = data["status"]
-        score = data["score"]
-        price = data["price"]
-        entry = data["entry"]
-        sl = data["sl"]
-
-        prev_status = st.session_state["last_status"].get(ticker)
-
-        # ================= ALERT =================
-        alert_type = None
-
-        # 🔥 Breakout
-        if status == "🔥 Breakout" and score >= 60:
-            alert_type = "breakout"
-
-        # ⚡ Pre-Breakout
-        elif status == "⚡ Pre-Breakout" and score >= 49:
-            alert_type = "pre"
-
-        # ❌ Fake breakout (optional)
-        elif prev_status == "🔥 Breakout" and status != "🔥 Breakout":
-            alert_type = "fake"
-
-
-        # ================= SEND =================
-        now = datetime.now().strftime("%d %b %Y %H:%M:%S")
-        if alert_type:
-
-            if ticker not in st.session_state["alerted"]:
-
-                if alert_type == "breakout":
-                    msg = (
-                        f"🔥 <b>BREAKOUT</b>\n"
-                        f"<b>{ticker}</b> @ {price}\n"
-                        f"⭐ Score: {score}\n"
-                        f"⏰ {now}"
-                    )
-
-                elif alert_type == "pre":
-                    msg = (
-                        f"⚡ <b>PRE-BREAKOUT</b>\n"
-                        f"<b>{ticker}</b> @ {price}\n"
-                        f"⭐ Score: {score}\n"
-                        f"⏰ {now}"
-                    )
-
-                elif alert_type == "fake":
-                    msg = (
-                        f"❌ <b>FAILED BREAKOUT</b>\n"
-                        f"<b>{ticker}</b> @ {price}\n"
-                        f"⏰ {now}"
-                    )
-
-                send_telegram(msg)
-
-                alerts.append(msg)
-                st.session_state["alerted"][ticker] = True
-
-        st.session_state["last_status"][ticker] = status
-
-        results.append({
-            "Ticker": ticker,
-            "Price": price,
-            "Entry": entry,
-            "SL": sl,
-            "Score": score,
-            "Type": status
-        })
-
-    df = pd.DataFrame(results)
-
-    if df.empty:
-        return {}, alerts, scan_time
-
-    df = df.sort_values(by="Score", ascending=False)
-
-    breakout_df = df[df["Type"] == "🔥 Breakout"].head(10)
-    pre_df = df[df["Type"] == "⚡ Pre-Breakout"].head(10)
-
-    return {
-        "🔥 Breakout": breakout_df,
-        "⚡ Pre-Breakout": pre_df
-    }, alerts, scan_time
-
-
-# ==========================================================
-# ===================== TELEGRAM FORMAT ====================
-# ==========================================================
-def render_message(data):
-
-    lines = []
-    lines.append("📊 <b>CRUZER AI — TOP SIGNALS</b>\n")
-
-    for cat, df in data.items():
-
-        if df is None or df.empty:
-            continue
-
-        lines.append(f"\n<b>{cat}</b>")
-
-        for i, row in df.iterrows():
-            lines.append(
-                f"{i+1}. <b>{row['Ticker']}</b> @ {row['Price']} "
-                f"(Score: {row['Score']})"
-            )
-
-    return "\n".join(lines)
-
-
-# ==========================================================
-# ===================== UI ================================
-# ==========================================================
-def render_trading_bot():
-
-    st.header("Real-Time Breakout Bot")
-
-    # ================= RUN SCAN =================
-    if st.button("🚀 Run Scan"):
-
-        with st.spinner("Scanning market..."):
-            data, alerts, scan_time = run_scan()
-
-        st.session_state["data"] = data
-        st.session_state["scan_time"] = scan_time
-
-        if alerts:
-            st.success("🚨 BREAKOUT DETECTED!")
-
-    # ================= SHOW TIME =================
-    scan_time = st.session_state.get("scan_time")
-    if scan_time:
-        st.caption(f"🕒 Last Scan: {scan_time}")
-
-    # ================= DISPLAY =================
-    data = st.session_state.get("data")
-
-    if data:
-        for category, df in data.items():
-
-            if df is None or df.empty:
-                continue
-
-            st.subheader(category)
-
-            st.dataframe(
-                df,
-                use_container_width=True,
-                hide_index=True
-            )
-
-# ==========================================================
 # ======================= ROUTER ===========================
 # ==========================================================
 menu = st.sidebar.radio(
     "📂 Menu",
     [
         "🔍 Screener",
-        "📡 Trading Bot",
         "📊 Stock Analysis",
         "💰 Dividend Screener",
         "📒 Trading Tracker - Summary",
@@ -2415,9 +1920,6 @@ menu = st.sidebar.radio(
 
 if menu == "🔍 Screener":
     render_screener()
-
-elif menu == "📡 Trading Bot":
-    render_trading_bot()
 
 elif menu == "📊 Stock Analysis":
     render_stock_analysis()
