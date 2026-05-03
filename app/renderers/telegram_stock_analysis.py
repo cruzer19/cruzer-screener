@@ -1,130 +1,208 @@
 def render_stock_analysis_message(kode, timeframe, analysis, news_result, insight_text, df_price):
-    from app.utils.analysis_engine import round_to_tick
+
     from app.utils.sector_utils import get_sector_badge
     from app.config.saham_profile import SAHAM_PROFILE
-    from datetime import datetime
 
-    # ================= BASIC DATA =================
-    last_price = analysis["last_price"]
-    support = analysis["support"]
-    resistance = analysis["resistance"]
-    trend = analysis["trend"]
+    # ================= CLEAN DF =================
+    df_price.columns = [
+        c[0] if isinstance(c, tuple) else c
+        for c in df_price.columns
+    ]
+    df_price.columns = [str(c).upper() for c in df_price.columns]
 
-    sector_emoji, sector_name = get_sector_badge(kode)
+    # ================= BASIC =================
+    last_price = df_price["CLOSE"].iloc[-1]
+    sector_emoji, _ = get_sector_badge(kode)
     company_name = SAHAM_PROFILE.get(kode, kode)
+    trend = analysis.get("trend", "-")
 
-    # ================= SUPPORT STRUCTURE =================
-    major_support = support
-    minor_support = analysis.get("minor_support")
-    micro_support = int(df_price["Low"].tail(7).min())
+    def rp(x):
+        return f"Rp {int(x):,}".replace(",", ".")
 
-    supports = [("Micro", micro_support)]
+    # ================= SUPPORT (ANTI ERROR FIX) =================
+    major = analysis.get("support")
+    minor = analysis.get("minor_support")
 
-    if minor_support:
-        supports.append(("Minor", minor_support))
-    if major_support:
-        supports.append(("Major", major_support))
+    micro = None
+    for c in df_price.columns:
+        if "LOW" in c:
+            micro = int(df_price[c].tail(7).min())
+            break
 
-    supports_sorted = sorted(
-        supports,
-        key=lambda x: abs(last_price - x[1])
+    supports = []
+
+    if micro:
+        supports.append(("Micro", micro))
+    if minor:
+        supports.append(("Minor", minor))
+    if major:
+        supports.append(("Major", major))
+
+    # 🔥 safety fallback (biar gak crash)
+    if not supports:
+        supports = [("Unknown", last_price)]
+
+    supports = sorted(supports, key=lambda x: abs(last_price - x[1]))
+
+    # aman ambil
+    near = supports[0]
+    mid = supports[1] if len(supports) > 1 else supports[0]
+    far = supports[2] if len(supports) > 2 else supports[-1]
+
+    near_label, near_price = near
+    mid_label, mid_price = mid
+    far_label, far_price = far
+
+    # ================= ENTRY =================
+    vol = df_price["CLOSE"].pct_change().std()
+    buffer = max(0.01, min(vol * 2, 0.04)) if vol else 0.02
+
+    entry_near = (
+        int(near_price * (1 - buffer)),
+        int(near_price * (1 + buffer * 1.5))
     )
 
-    near_support = supports_sorted[0][1]
-    near_label = supports_sorted[0][0]
+    entry_deep = (
+        int(mid_price * (1 - buffer * 1.5)),
+        int(mid_price * (1 + buffer))
+    )
 
-    mid_support = supports_sorted[1][1] if len(supports_sorted) > 1 else near_support
-    mid_label = supports_sorted[1][0] if len(supports_sorted) > 1 else near_label
+    sl = int(mid_price * 0.97)
+    risk = ((last_price - sl) / last_price) * 100 if last_price else 0
 
-    far_support = supports_sorted[2][1] if len(supports_sorted) > 2 else mid_support
-    far_label = supports_sorted[2][0] if len(supports_sorted) > 2 else mid_label
+    # ================= GAP ANALYSIS (MATCH UI 100%) =================
+    gaps = []
 
-    # ================= ENTRY PLAN =================
-    entry_near_low = round_to_tick(near_support * 0.995)
-    entry_near_high = round_to_tick(near_support * 1.015)
+    for i in range(2, len(df_price)):
+        c1_high = df_price.iloc[i - 2]["HIGH"]
+        c1_low = df_price.iloc[i - 2]["LOW"]
 
-    entry_deep_low = round_to_tick(mid_support * 0.99)
-    entry_deep_high = round_to_tick(mid_support * 1.02)
+        c3_high = df_price.iloc[i]["HIGH"]
+        c3_low = df_price.iloc[i]["LOW"]
 
-    risk_pct = analysis["risk_pct"]
+        date = df_price.index[i]
 
-    # ================= DATE FORMAT =================
-    def fmt_date(date_str):
-        return datetime.strptime(date_str, "%Y-%m-%d").strftime("%d-%b-%Y")
+        # bullish imbalance
+        if c3_low > c1_high:
+            gap_low = c1_high
+            gap_high = c3_low
 
-    def fmt_range(start, end):
-        s = fmt_date(start)
-        e = fmt_date(end)
-        return f"{s} — {e}"
+            size = (gap_high - gap_low) / gap_low
+            if size > 0.015:
+                gaps.append({
+                    "low": gap_low,
+                    "high": gap_high,
+                    "date": date
+                })
 
-    # ================= CYCLE =================
-    cycle = analysis.get("cycle")
+        # bearish imbalance
+        elif c3_high < c1_low:
+            gap_low = c3_high
+            gap_high = c1_low
 
-    cycle_low_text = ""
-    cycle_high_text = ""
+            size = (gap_high - gap_low) / gap_low
+            if size > 0.015:
+                gaps.append({
+                    "low": gap_low,
+                    "high": gap_high,
+                    "date": date
+                })
 
-    if cycle:
-        cycle_low_text = (
-            f"\n<b>📉 Cycle Low Window</b>\n"
-            f"Last Low  : {fmt_date(cycle['last_low'])}\n"
-            f"Near Low : {fmt_range(cycle['next_low_start'], cycle['next_low_end'])}\n"
-            f"Next Low : {fmt_range(cycle['second_low_start'], cycle['second_low_end'])}\n"
-        )
+    # sort by time
+    gaps = sorted(gaps, key=lambda x: x["date"])
 
-        cycle_high_text = (
-            f"\n<b>📈 Cycle High Window</b>\n"
-            f"Near High : {fmt_range(cycle['next_high_start'], cycle['next_high_end'])}\n"
-            f"Next High : {fmt_range(cycle['second_high_start'], cycle['second_high_end'])}\n"
-        )
+    # ================= MERGE ZONE =================
+    merged = []
 
-    # ================= SENTIMENT ICON =================
+    for g in gaps:
+        if not merged:
+            merged.append(g)
+            continue
+
+        last = merged[-1]
+
+        if abs(g["low"] - last["high"]) / last["high"] < 0.03:
+            last["low"] = min(last["low"], g["low"])
+            last["high"] = max(last["high"], g["high"])
+            last["date"] = g["date"]
+        else:
+            merged.append(g)
+
+    # ambil 3 terakhir
+    gaps = merged[-3:]
+
+    # sort by distance (biar relevan)
+    gaps = sorted(
+        gaps,
+        key=lambda g: abs(((g["low"] + g["high"]) / 2) - last_price)
+    )
+
+    # ================= FORMAT =================
+    if gaps:
+        gap_text = "📊 <b>Gap Analysis</b>\n"
+
+        for g in reversed(gaps):
+
+            mid_gap = (g["low"] + g["high"]) / 2
+
+            # 🔥 label berdasarkan posisi (INI YANG BENER)
+            if mid_gap > last_price:
+                label = "Gap Atas"
+            else:
+                label = "Gap Bawah"
+
+            dist = abs(mid_gap - last_price) / last_price * 100
+
+            gap_text += (
+                f"{label} : {rp(g['low'])} - {rp(g['high'])} ({dist:.1f}%)\n"
+            )
+
+    else:
+        gap_text = "📊 <b>Gap Analysis</b>\nTidak ada gap signifikan\n"
+
+    # ================= NEWS =================
     sentiment = news_result.get("sentiment", "NEUTRAL")
 
-    if sentiment == "POSITIVE":
-        sentiment_icon = "🟢"
-    elif sentiment == "NEGATIVE":
-        sentiment_icon = "🔴"
-    elif sentiment == "SPECULATIVE":
-        sentiment_icon = "🟣"
-    else:
-        sentiment_icon = "⚪"
+    sentiment_icon = {
+        "POSITIVE": "🟢",
+        "NEGATIVE": "🔴",
+        "SPECULATIVE": "🟣",
+    }.get(sentiment, "⚪")
 
-    # ================= CLICKABLE NEWS =================
     news_lines = ""
-    if news_result.get("news"):
-        for n in news_result["news"][:5]:
-            if n.get("title") and n.get("link"):
-                news_lines += f'\n• <a href="{n["link"]}">{n["title"]}</a>'
+    for n in news_result.get("news", [])[:5]:
+        if n.get("title") and n.get("link"):
+            news_lines += f'• <a href="{n["link"]}">{n["title"]}</a>\n'
+
+    news_lines = news_lines.rstrip()
 
     # ================= FINAL MESSAGE =================
-    msg = (
-        f"<b>📊 STOCK ANALYSIS</b>\n"
-        f"{sector_emoji} <b>{company_name}</b> ({kode})\n\n"
+    msg = f"""
+📊 <b>STOCK ANALYSIS</b>
+{sector_emoji} <b>{company_name}</b> ({kode})
 
-        f"<b>🧭 Market Condition</b>\n"
-        f"Trend   : {trend}\n"
-        f"Harga  : Rp {int(last_price):,}\n\n"
+🧭 <b>Market Condition</b>
+Trend : {trend}
+Harga : {rp(last_price)}
 
-        f"<b>📉 Support & Resistance</b>\n"
-        f"Support (Near) : Rp {int(near_support):,} ({near_label})\n"
-        f"Support (Mid)   : Rp {int(mid_support):,} ({mid_label})\n"
-        f"Support (Far)    : Rp {int(far_support):,} ({far_label})\n"
-        f"Resistance        : Rp {int(resistance):,}\n\n"
+📉 <b>Support & Resistance</b>
+Support (Near) : {rp(near_price)} ({near_label})
+Support (Mid)   : {rp(mid_price)} ({mid_label})
+Support (Far)    : {rp(far_price)} ({far_label})
+Resistance        : {rp(analysis.get("resistance"))}
 
-        f"<b>🎯 Entry Plan</b>\n"
-        f"Entry Near : Rp {entry_near_low:,} - Rp {entry_near_high:,}\n"
-        f"Entry Deep : Rp {entry_deep_low:,} - Rp {entry_deep_high:,}\n"
-        f"Risk            : {risk_pct} %\n"
+🎯 <b>Entry Plan</b>
+Entry Near  : {rp(entry_near[0])} - {rp(entry_near[1])}
+Entry Deep : {rp(entry_deep[0])} - {rp(entry_deep[1])}
+SL                : {rp(sl)}
+Risk             : {risk:.2f} %
 
-        f"{cycle_low_text}"
-        f"{cycle_high_text}\n"
+{gap_text}
+📰 <b>News & Sentiment</b>
+{sentiment_icon} {sentiment}
+{news_lines}
+🧠 <b>Insight</b>
+{insight_text}
+"""
 
-        f"<b>📰 News & Sentiment</b>\n"
-        f"{sentiment_icon} <b>{sentiment}</b>"
-        f"{news_lines}\n\n"
-
-        f"<b>🧠 Insight</b>\n"
-        f"{insight_text}"
-    )
-
-    return msg.replace(",", ".")
+    return msg

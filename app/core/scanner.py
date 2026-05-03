@@ -94,7 +94,7 @@ def scan_day(state=None):
             # ================= ANTI SPAM =================
             key = None
             if alert_type:
-                key = f"{ticker}_{alert_type}"
+                key = f"{ticker}_{alert_type}_{round(price, -2)}"
 
             # ================= MESSAGE =================
             if alert_type and key not in alerted:
@@ -108,9 +108,9 @@ def scan_day(state=None):
                         f"🔥 <b>BREAKOUT (DAY)</b>\n"
                         f"<b>{ticker}</b> @ {price}\n"
                         f"🎯 Entry  : {entry_range}\n"
-                        f"🛑 SL     : {sl}\n"
+                        f"🛑 SL       : {sl}\n"
                         f"⭐ <b>Score : {score}</b>\n"
-                        f"📊 Vol    : {vol_ratio}x\n"
+                        f"📊 Vol      : {vol_ratio}x\n"
                         f"⏰ {now}"
                     )
 
@@ -119,9 +119,9 @@ def scan_day(state=None):
                         f"🚀 <b>EARLY BREAKOUT</b>\n"
                         f"<b>{ticker}</b> @ {price}\n"
                         f"🎯 Entry  : {entry_range}\n"
-                        f"🛑 SL     : {sl}\n"
+                        f"🛑 SL       : {sl}\n"
                         f"⭐ <b>Score : {score}</b>\n"
-                        f"📊 Vol    : {vol_ratio}x\n"
+                        f"📊 Vol      : {vol_ratio}x\n"
                         f"⏰ {now}"
                     )
 
@@ -130,9 +130,9 @@ def scan_day(state=None):
                         f"⚡ <b>PRE-BREAKOUT (DAY)</b>\n"
                         f"<b>{ticker}</b> @ {price}\n"
                         f"🎯 Entry  : {entry_range}\n"
-                        f"🛑 SL     : {sl}\n"
+                        f"🛑 SL       : {sl}\n"
                         f"⭐ <b>Score : {score}</b>\n"
-                        f"📊 Vol    : {vol_ratio}x\n"
+                        f"📊 Vol      : {vol_ratio}x\n"
                         f"⏰ {now}"
                     )
 
@@ -141,7 +141,7 @@ def scan_day(state=None):
                         f"📈 <b>STRONG TREND</b>\n"
                         f"<b>{ticker}</b> @ {price}\n"
                         f"⭐ <b>Score : {score}</b>\n"
-                        f"📊 Vol    : {vol_ratio}x\n"
+                        f"📊 Vol      : {vol_ratio}x\n"
                         f"⏰ {now}"
                     )
 

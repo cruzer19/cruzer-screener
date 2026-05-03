@@ -102,8 +102,8 @@ def detect_day_trade(df):
     price = close.iloc[-1]
 
     # ================= LEVEL =================
-    recent_high = high.tail(15).max()
-    recent_low = low.tail(15).min()
+    recent_high = high.tail(30).max()
+    recent_low = low.tail(30).min()
 
     entry_high = round_price(recent_high * 1.01)
     entry_low = round_price(entry_high * 0.985)
@@ -140,9 +140,9 @@ def detect_day_trade(df):
 
     # ================= SCORE =================
     score = (
-        min(vol_ratio * 35, 45) +
+        min(vol_ratio * 25, 35) +
         up_count * 2 +
-        max(0, momentum * 2)
+        max(0, momentum * 3)
     )
 
     # BOOSTS
@@ -167,7 +167,7 @@ def detect_day_trade(df):
     if arb_signal:
         status = "🧲 Rebound ARB"
 
-    elif price > recent_high * 1.003 and vol_ratio > 1.2:
+    elif price > recent_high * 1.003 and vol_ratio > 1.3:
         status = "🔥 Breakout"
 
     elif early_break:

@@ -1,57 +1,13 @@
+import pandas as pd
+
 from app.screeners.base import BaseScreener
 from app.models.stock_result import StockResult
 from app.core.data_loader import load_daily_data
-from app.core.indicators import ema
 from app.utils.helpers import round_down, round_up
 
-import pandas as pd
-
 
 # ==========================================================
-# 🔥 RSI TRADINGVIEW
-# ==========================================================
-def rsi_tradingview(series, period=14):
-
-    delta = series.diff()
-
-    gain = delta.clip(lower=0)
-    loss = -delta.clip(upper=0)
-
-    avg_gain = gain.rolling(period).mean()
-    avg_loss = loss.rolling(period).mean()
-
-    avg_gain = avg_gain.combine_first(
-        gain.ewm(alpha=1/period, adjust=False).mean()
-    )
-    avg_loss = avg_loss.combine_first(
-        loss.ewm(alpha=1/period, adjust=False).mean()
-    )
-
-    rs = avg_gain / avg_loss
-    return 100 - (100 / (1 + rs))
-
-
-# ==========================================================
-# 🔥 RSI SCORE
-# ==========================================================
-def get_rsi_score(rsi):
-
-    if rsi <= 20:
-        return 3
-    elif rsi <= 30:
-        return 4
-    elif rsi <= 45:
-        return 5
-    elif rsi <= 60:
-        return 4
-    elif rsi <= 70:
-        return 3
-    else:
-        return 2
-
-
-# ==========================================================
-# 🔥 BANDAR ACCUMULATION DETECTOR
+# 🟢 ACCUMULATION SCORE
 # ==========================================================
 def get_accumulation_score(df):
 
@@ -61,255 +17,268 @@ def get_accumulation_score(df):
     close = df["Close"]
 
     vol_ma5 = volume.rolling(5).mean()
+    vol_ma10 = volume.rolling(10).mean()
     vol_ma20 = volume.rolling(20).mean()
 
-    spread = high - low
+    spread = (high - low).replace(0, 1)
     avg_range = spread.rolling(10).mean()
-
-    last_vol = volume.iloc[-1]
-    last_vol5 = vol_ma5.iloc[-1]
-    last_vol20 = vol_ma20.iloc[-1]
-
-    last_spread = spread.iloc[-1]
-    last_avg_range = avg_range.iloc[-1]
-
-    last_close = close.iloc[-1]
-    last_low = low.iloc[-1]
-    last_high = high.iloc[-1]
 
     score = 0
 
-    # ================= VOLUME ACCUMULATION =================
-    if last_vol5 > last_vol20:
+    # Volume acceleration (lebih smooth)
+    if vol_ma5.iloc[-1] > vol_ma20.iloc[-1] * 1.3:
+        score += 20
+
+    if vol_ma10.iloc[-1] > vol_ma20.iloc[-1] * 1.2:
+        score += 15
+
+    # Close position (buyer dominance)
+    close_pos = (close.iloc[-1] - low.iloc[-1]) / spread.iloc[-1]
+    if close_pos > 0.7:
+        score += 20
+
+    # Volatility contraction
+    if spread.iloc[-1] < avg_range.iloc[-1] * 0.8:
+        score += 20
+
+    # Volume consistency (bukan spike doang)
+    if volume.tail(5).mean() > vol_ma20.iloc[-1] * 1.2:
+        score += 15
+
+    # Higher low (structure)
+    if low.iloc[-1] > low.iloc[-3]:
         score += 10
 
-    # ================= CLOSE NEAR HIGH =================
-    if last_high - last_low > 0:
-        close_pos = (last_close - last_low) / (last_high - last_low)
+    # 🔥 slow accumulation (big cap friendly)
+    if vol_ma5.iloc[-1] > vol_ma20.iloc[-1] * 1.05:
+        score += 10
 
-        if close_pos > 0.6:
-            score += 8
-
-    # ================= VOLATILITY CONTRACTION =================
-    if last_spread < last_avg_range:
-        score += 6
-
-    # ================= CONSISTENT VOLUME =================
-    recent_vol = volume.tail(5).mean()
-
-    if recent_vol > vol_ma20.iloc[-1]:
-        score += 6
+    if close.iloc[-1] > close.iloc[-5]:
+        score += 10
 
     return score
 
 
 # ==========================================================
-# 🔥 MAIN SCREENER
+# 📈 UPTREND SCORE (REPLACEMENT MOMENTUM 🔥)
+# ==========================================================
+def get_uptrend_score(df):
+
+    close = df["Close"]
+
+    ma5 = close.rolling(5).mean()
+    ma20 = close.rolling(20).mean()
+
+    # 🔥 slope (WAJIB ADA SEBELUM DIPAKAI)
+    if len(ma20) < 6:
+        return 0
+
+    ma20_slope = ma20.iloc[-1] - ma20.iloc[-5]
+
+    score = 0
+
+    # MA alignment
+    if ma5.iloc[-1] > ma20.iloc[-1]:
+        score += 30
+
+    # price above MA20
+    if close.iloc[-1] > ma20.iloc[-1]:
+        score += 25
+
+    # higher close
+    if close.iloc[-1] > close.iloc[-3]:
+        score += 25
+
+    # 🔥 slope trend (INI YANG TADI ERROR)
+    if ma20_slope > 0:
+        score += 20
+
+    return score
+
+# ==========================================================
+# 📍 TREND POSITION (EARLY / MID / LATE)
+# ==========================================================
+def get_trend_position(df):
+
+    close = df["Close"]
+    ma20 = close.rolling(20).mean()
+
+    distance = (close.iloc[-1] - ma20.iloc[-1]) / ma20.iloc[-1]
+
+    if distance < 0.08:
+        return "🟢 Early"
+    elif distance < 0.15:
+        return "🟡 Mid"
+    else:
+        return "🔴 Late"
+
+
+# ==========================================================
+# 📉 STRUCTURE
+# ==========================================================
+def get_structure(df):
+
+    close = df["Close"]
+    low = df["Low"]
+
+    support = low.tail(30).min()
+    last_close = close.iloc[-1]
+
+    distance = abs(last_close - support) / support
+
+    return distance, support
+
+# ==========================================================
+# ⚡ PRICE MOVEMENT FILTER (ANTI SAHAM LEMOT)
+# ==========================================================
+def is_active_stock(df):
+
+    high = df["High"]
+    low = df["Low"]
+    close = df["Close"]
+
+    # 🔥 range harian
+    spread = (high - low).replace(0, 1)
+
+    # 🔥 ATR sederhana
+    avg_range = spread.rolling(10).mean()
+
+    last_range = spread.iloc[-1]
+    last_price = close.iloc[-1]
+
+    # 🔥 persentase gerakan
+    move_pct = last_range / last_price
+
+    # ================= RULE =================
+    # minimal gerakan 1.5% - 2%
+    return move_pct >= 0.007
+
+
+# ==========================================================
+# 🔥 MAIN SCREENER (UPTREND VERSION)
 # ==========================================================
 class SwingTradeWeekScreener(BaseScreener):
 
-    screener_type = "Swing Trade (Week)"
+    screener_type = "Swing Trade (Week) v8 - Acc + Trend"
 
     def analyze(self, kode: str):
 
-        # ================= LOAD DATA =================
-        df_daily = load_daily_data(kode)
+        df = load_daily_data(kode)
 
-        if df_daily is None or df_daily.empty:
+        if df is None or df.empty or len(df) < 50:
             return None
 
-        df_daily = df_daily.copy()
-        df_daily.index = pd.to_datetime(df_daily.index)
-        df_daily = df_daily.sort_index()
+        df = df.copy()
+        df.columns = [c.capitalize() for c in df.columns]
 
-        df_daily = df_daily[~df_daily.index.duplicated(keep="last")]
-        df_daily = df_daily.dropna()
-
-        df_daily = df_daily[df_daily["Close"] > 0]
-
-        if len(df_daily) < 50:
+        if "Close" not in df.columns:
             return None
 
-        # ==================================================
-        # 🔥 BANDAR ACCUMULATION (DAILY BASE)
-        # ==================================================
-        accumulation_score = get_accumulation_score(df_daily)
+        df = df.sort_index().dropna()
+        df = df[df["Close"] > 0]
 
-        # ================= WEEKLY =================
-        df_weekly = df_daily.resample("W-FRI").agg({
-            "Open": "first",
-            "High": "max",
-            "Low": "min",
-            "Close": "last",
-            "Volume": "sum"
-        }).dropna()
-
-        if df_weekly.empty or len(df_weekly) < 15:
+        if not is_active_stock(df):
             return None
 
-        # ==================================================
-        # 🔥 RSI DAILY
-        # ==================================================
-        if "Adj Close" in df_daily.columns:
-            close_daily = df_daily["Adj Close"]
+        # ================= LIQUIDITY =================
+        avg_vol = df["Volume"].tail(20).mean()
+        if avg_vol < 500_000:
+            return None
+
+        last_close = float(df["Close"].iloc[-1])
+
+        # ================= SCORES =================
+        acc_score = get_accumulation_score(df)
+        trend_score = get_uptrend_score(df)
+        distance, support = get_structure(df)
+        trend_position = get_trend_position(df)
+
+        # ================= TREND STRENGTH FILTER =================
+        close = df["Close"]
+
+        if close.iloc[-1] < close.iloc[-3] * 0.995:
+            return None
+
+        # ================= DISTANCE FILTER =================
+        if distance > 0.16:
+            return None
+
+        # ================= LEADER FILTER =================
+        price_change_5d = (close.iloc[-1] - close.iloc[-5]) / close.iloc[-5]
+
+        if price_change_5d < 0.01:
+            return None
+
+        # ================= CLASSIFICATION =================
+
+        # 🔥 ACC + UPTREND (BEST)
+        if acc_score >= 75 and trend_score >= 60:
+
+            setup = "🔥 Accumulation + Uptrend"
+
+            pullback_zone = df["Close"].tail(5).min()
+
+            entry_low = round_down(pullback_zone)
+            entry_high = round_up(last_close * 1.02)
+
+            sl = round_down(support * 0.97)
+
+            tp1 = round_up(last_close * 1.08)
+            tp2 = round_up(last_close * 1.15)
+
+            main_score = acc_score * 0.6 + trend_score * 0.4
+
+        # 🟢 SMART ACCUMULATION
+        elif acc_score >= 60 and trend_score < 70 and distance <= 0.10:
+
+            setup = "🟢 Smart Accumulation"
+
+            entry_low = round_down(support * 0.98)
+            entry_high = round_up(support * 1.04)
+
+            sl = round_down(support * 0.95)
+
+            tp1 = round_up(last_close * 1.05)
+            tp2 = round_up(last_close * 1.10)
+
+            main_score = acc_score * 0.8 + trend_score * 0.2
+
         else:
-            close_daily = df_daily["Close"]
-
-        rsi_daily = rsi_tradingview(close_daily, 14)
-
-        last_rsi = (
-            float(rsi_daily.iloc[-1])
-            if not pd.isna(rsi_daily.iloc[-1])
-            else 50
-        )
-
-        # ==================================================
-        # 🔥 WEEKLY TREND
-        # ==================================================
-        close = df_weekly["Close"]
-        volume = df_weekly["Volume"]
-
-        ema20 = ema(close, 20)
-        ema50 = ema(close, 50)
-
-        vol_ma10 = volume.rolling(10).mean()
-
-        # ==================================================
-        # 🔥 BAND ACCUMULATION DETECTOR
-        # ==================================================
-        bb_mid = close.rolling(20).mean()
-        bb_std = close.rolling(20).std()
-
-        bb_upper = bb_mid + (bb_std * 2)
-        bb_lower = bb_mid - (bb_std * 2)
-
-        bandwidth = (bb_upper - bb_lower) / bb_mid
-
-        last_bandwidth = (
-            float(bandwidth.iloc[-1])
-            if not pd.isna(bandwidth.iloc[-1])
-            else 1
-        )
-
-        band_accumulation = 1 if last_bandwidth < 0.12 else 0
-
-        last_close = float(close.iloc[-1])
-
-        last_ema20 = float(ema20.iloc[-1]) if not pd.isna(ema20.iloc[-1]) else last_close
-        last_ema50 = float(ema50.iloc[-1]) if not pd.isna(ema50.iloc[-1]) else last_close
-
-        last_volume = float(volume.iloc[-1])
-        last_vol_ma = float(vol_ma10.iloc[-1]) if not pd.isna(vol_ma10.iloc[-1]) else last_volume
-
-        # ==================================================
-        # 🔥 RSI WEEKLY
-        # ==================================================
-        rsi_weekly = rsi_tradingview(close, 14)
-
-        last_rsi_weekly = (
-            float(rsi_weekly.iloc[-1])
-            if not pd.isna(rsi_weekly.iloc[-1])
-            else 50
-        )
-
-        # ==================================================
-        # ❌ OVERBOUGHT FILTER
-        # ==================================================
-        distance_from_ema = (last_close - last_ema20) / last_ema20 * 100
-
-        if last_rsi_weekly >= 70 or distance_from_ema > 10:
             return None
-
-        # ==================================================
-        # 🔥 SCORING
-        # ==================================================
-        score = 0
-
-        breakdown = {
-            "Trend": 0,
-            "RSI": 0,
-            "Volume": 0,
-            "Accumulation": accumulation_score
-        }
-
-        # ===== TREND =====
-        if last_ema20 > last_ema50:
-            score += 20
-            breakdown["Trend"] += 20
-
-        if last_close > last_ema20:
-            score += 20
-            breakdown["Trend"] += 20
-
-        # ===== RSI STATUS =====
-        if last_rsi <= 30:
-            rsi_status = "🟢 Oversold"
-        elif last_rsi >= 70:
-            rsi_status = "🔴 Overbought"
-        else:
-            rsi_status = "⚪ Normal"
-
-        # ===== RSI SCORE =====
-        if last_rsi <= 20:
-            score += 25
-            breakdown["RSI"] += 25
-
-        elif last_rsi <= 30:
-            score += 15
-            breakdown["RSI"] += 15
-
-        elif 30 < last_rsi <= 45:
-            score += 5
-            breakdown["RSI"] += 5
-
-        elif 55 <= last_rsi <= 70:
-            score += 20
-            breakdown["RSI"] += 20
-
-        # ===== VOLUME =====
-        if last_volume > last_vol_ma:
-            score += 20
-            breakdown["Volume"] += 20
-
-        # ==================================================
-        # 🔥 FINAL RANK (ACCUMULATION MASUK)
-        # ==================================================
-        rsi_score = get_rsi_score(last_rsi)
-
-        rank = (
-            rsi_score * 10 +
-            breakdown["Trend"] * 0.5 +
-            breakdown["Volume"] * 0.5 +
-            accumulation_score * 1.2 +
-            score * 0.3
-        )
-
-        # ================= ENTRY =================
-        entry_low = round_down(last_ema20 * 0.97)
-        entry_high = round_up(last_ema20 * 1.03)
-
-        tp1 = round_up(last_close * 1.04)
-        tp2 = round_up(last_close * 1.08)
-
-        sl = round_down(last_ema50 * 0.97)
 
         # ================= RR =================
         risk = last_close - sl
         reward = tp2 - last_close
+        rr = (reward / risk) * 100 if risk > 0 else 0
 
-        rr = round((reward / risk) * 100, 1) if risk > 0 else 0
+        # ================= DEBUG =================
+        print(
+            kode,
+            "| setup:", setup,
+            "| acc:", acc_score,
+            "| trend:", trend_score
+        )
+
+        # ================= NORMALIZE SCORE =================
+        MAX_SCORE = 120  # asumsi max internal
+
+        normalized_score = (main_score / MAX_SCORE) * 100
+
+        # clamp biar gak lewat 100
+        normalized_score = max(0, min(100, normalized_score))
+
+        score = int(round(normalized_score / 5) * 5)
 
         # ================= RETURN =================
         return StockResult(
-
             kode=kode,
             last_price=int(last_close),
 
-            score=int(score),
-            rank=round(rank, 2),
+            score = score,
+            rank=float(main_score),
 
-            setup="Swing Weekly",
-            trend="Bullish" if last_ema20 > last_ema50 else "Bearish",
+            setup=setup,
+            trend=trend_position,  # 🔥 INI BARU
 
             entry_low=int(entry_low),
             entry_high=int(entry_high),
@@ -317,13 +286,13 @@ class SwingTradeWeekScreener(BaseScreener):
             tp=[int(tp1), int(tp2)],
             sl=int(sl),
 
-            rr=float(rr),
+            rr=round(rr, 1),
 
-            recommendation="Wait / Buy Pullback",
+            recommendation="Swing v8",
             screener_type=self.screener_type,
 
-            score_breakdown=breakdown,
-
-            rsi_value=round(last_rsi, 2),
-            rsi_status=rsi_status
+            score_breakdown={
+                "Accumulation": acc_score,
+                "Trend": trend_score
+            }
         )

@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Dict, Optional
 
 
@@ -31,5 +31,16 @@ class StockResult:
     rsi_value: Optional[float] = None
     rsi_status: Optional[str] = None
 
-    # ================= 🔥 NEW (RANKING) =================
+    # ================= 🔥 RANK =================
     rank: float = 0
+
+    # ================= 🔥 NEW: PRICE STRUCTURE =================
+    support: Optional[int] = None
+    resistance: Optional[int] = None
+
+    # ================= 🔥 NEW: SMART DATA =================
+    accumulation_score: Optional[float] = None
+    volume_score: Optional[float] = None
+
+    # ================= 🔥 NEW: EXTENSIBLE (FUTURE PROOF) =================
+    extra: Dict = field(default_factory=dict)

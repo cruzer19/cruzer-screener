@@ -1,8 +1,9 @@
-from datetime import datetime
+from datetime import datetime, time
 import requests
 import os
 
 
+# ================= UTIL =================
 def split_tp(tp_str: str):
     if not tp_str or "/" not in tp_str:
         return tp_str, "-", "-"
@@ -20,136 +21,216 @@ def format_score(score):
         return score
 
 
-def derive_signal(score, trend, rsi, entry: str) -> str:
-    """
-    Output:
-    - 🟢 BUY (Pullback)
-    - 🟢 BUY (Breakout)
-    - 🟡 HOLD (Trail Stop)
-    - 🟡 WAIT
-    """
-    try:
-        score = float(score)
-        trend = float(trend)
-        rsi = float(rsi)
-    except Exception:
-        return "🟡 WAIT"
+# ================= MARKET CONDITION =================
+def get_market_condition(df_ihsg):
 
-    is_range_entry = "–" in entry or "-" in entry
+    if df_ihsg is None or df_ihsg.empty or len(df_ihsg) < 2:
+        return "unknown", 0
 
-    # HOLD: already extended
-    if score >= 85 and rsi >= 65:
-        return "🟡 Hold (Trail Stop)"
+    last = float(df_ihsg.iloc[-1]["CLOSE"])
+    prev = float(df_ihsg.iloc[-2]["CLOSE"])
 
-    # BUY BREAKOUT
-    if trend >= 60 and 50 <= rsi <= 70 and not is_range_entry:
-        return "🟢 Buy (Breakout)"
+    change_pct = ((last - prev) / prev) * 100
+    change_pct = round(change_pct, 2)
 
-    # BUY PULLBACK
-    if trend >= 40 and rsi <= 45 and is_range_entry:
-        return "🟢 Buy (Pullback)"
+    now = datetime.now().time()
+    market_open = time(9, 0) <= now <= time(16, 0)
 
-    # WAIT
-    if score < 70:
-        return "🟡 Wait Confirmation"
+    if change_pct >= 1.0:
+        state = "strong_bull"
+    elif change_pct >= 0.3:
+        state = "bull"
+    elif change_pct <= -1.0:
+        state = "strong_bear"
+    elif change_pct <= -0.3:
+        state = "bear"
+    else:
+        state = "sideways"
 
-    return "🟢 Buy (Pullback)"
+    if not market_open:
+        state = f"premarket_{state}"
+
+    return state, change_pct
+
+
+# ================= LEGACY (DIBIARKAN, TIDAK DIPAKAI) =================
+def derive_signal(score, trend, rsi, entry: str, setup: str):
+    return "🟡 Wait"
 
 
 def derive_context(score, trend) -> str:
-    try:
-        score = float(score)
-        trend = float(trend)
-    except Exception:
-        return "Range Consolidation"
-
-    if trend >= 60:
-        return "Strong Uptrend"
-
-    if score >= 80:
-        return "Bullish Continuation"
-
-    if trend >= 40:
-        return "Bullish Pullback Zone"
-
     return "Range Consolidation"
 
 
+def format_rsi_status(rsi):
+    return "⚪ Normal"
+
+
+# ================= FORMAT PER STOCK (UPDATED) =================
+def format_stock_block(r, idx):
+
+    kode = r.get("Kode", "-")
+    harga = r.get("Harga", "-")
+    score = format_score(r.get("Score", 0))
+
+    setup = r.get("Setup", "-")
+    trend = r.get("Trend", "-")
+
+    entry = r.get("Entry", "-")
+    tp_raw = r.get("TP", "-")
+    sl = r.get("SL", "-")
+
+    tp1, tp2, _ = split_tp(tp_raw)
+
+    return f"""
+<b>{idx}. {kode}</b> ({harga}) | <b>Score:</b> {score}/100
+Setup       : {setup}
+Trend       : {trend}
+Entry        : {entry}
+TP1          : {tp1}
+TP2          : {tp2}
+SL             : {sl}
+"""
+
+
+# ================= TRADING NOTES (UPDATED) =================
+def generate_trading_notes(state, change_pct):
+
+    pct = f"{change_pct:+.2f}%"
+
+    if "strong_bull" in state:
+        return (
+            "⚠️ <b>Trading Plan (Next Day)</b>\n"
+            f"• IHSG strong bullish ({pct})\n"
+            "• Bias: kemungkinan lanjut naik (continuation)\n"
+            "• Skenario:\n"
+            "  - Jika pullback → peluang entry terbaik\n"
+            "  - Jika gap up tinggi → hindari kejar\n"
+            "• Fokus: Acc + Uptrend (Early)\n"
+            "• Strategi: buy on weakness, bukan strength"
+        )
+
+    elif "bull" in state:
+        return (
+            "⚠️ <b>Trading Plan (Next Day)</b>\n"
+            f"• IHSG naik ({pct})\n"
+            "• Bias: cenderung lanjut naik, tapi bisa pullback dulu\n"
+            "• Skenario:\n"
+            "  - Pullback sehat → entry opportunity\n"
+            "  - Sideways → tunggu konfirmasi\n"
+            "• Fokus: Early / Mid trend\n"
+            "• Strategi: entry bertahap"
+        )
+
+    elif "bear" in state:
+        return (
+            "⚠️ <b>Trading Plan (Next Day)</b>\n"
+            f"• IHSG melemah ({pct})\n"
+            "• Bias: potensi lanjut turun / weak bounce\n"
+            "• Skenario:\n"
+            "  - Rebound lemah → peluang sell / avoid\n"
+            "  - Jika ada reversal kuat → baru entry selektif\n"
+            "• Fokus: Smart Accumulation\n"
+            "• Strategi: tunggu konfirmasi, jangan agresif"
+        )
+
+    elif "strong_bear" in state:
+        return (
+            "⚠️ <b>Trading Plan (Next Day)</b>\n"
+            f"• IHSG turun tajam ({pct})\n"
+            "• Bias: high risk, bisa lanjut turun / dead cat bounce\n"
+            "• Skenario:\n"
+            "  - Rebound cepat → biasanya tidak sustain\n"
+            "  - Breakdown lanjutan → hindari entry\n"
+            "• Fokus: capital preservation\n"
+            "• Strategi: wait & see"
+        )
+
+    else:
+        return (
+            "⚠️ <b>Trading Plan (Next Day)</b>\n"
+            f"• IHSG sideways ({pct})\n"
+            "• Bias: market masih wait & see\n"
+            "• Skenario:\n"
+            "  - Break atas → lanjut uptrend\n"
+            "  - Break bawah → lanjut turun\n"
+            "• Fokus: accumulation phase\n"
+            "• Strategi: entry dekat support, jangan di tengah"
+        )
+
+# ================= MAIN RENDER (UPDATED) =================
 def render_telegram(
     results,
-    title: str = "CRUZER AI — DAILY TRADING PLAN",
-    max_items: int = 10
+    df_ihsg=None,
+    title: str = "CRUZER AI - DAILY TRADING PLAN",
+    max_items: int = 15
 ) -> str:
-    today = datetime.now().strftime("%d %B %Y")
-    lines = []
 
-    # ===== HEADER =====
-    lines.append(f"🤖 <b>{title}</b>")
-    lines.append(f"📅 {today}")
-    lines.append("⏰ Last Price Based")
-    lines.append("")
+    now = datetime.now()
+    today = now.strftime("%d %B %Y")
+    time_now = now.strftime("%H:%M WIB")
 
-    results = results[:max_items]
+    msg = f"""🤖 <b>{title}</b>
+📅 {today} | ⏰ {time_now}
+📡 Real-time Price Based
+"""
 
-    for idx, r in enumerate(results, start=1):
-        kode = r.get("Kode", "-")
-        harga = r.get("Harga", "-")
-        score = r.get("Score", 0)
+    SEPARATOR = "\n━━━━━━━━━━━━━━━━━━━━━━━━\n"
 
-        trend = r.get("Trend", 0)
-        rsi = r.get("RSI", 0)
+    # ================= GROUPING =================
+    best = []
+    accumulation = []
 
-        entry = r.get("Entry", "-")
-        tp_raw = r.get("TP", "-")
-        sl = r.get("SL", "-")
-        gain = r.get("Gain (%)", "0")
+    for r in results:
+        setup = str(r.get("Setup", ""))
 
-        setup = r.get("Setup", "Swing Setup")
+        if "Uptrend" in setup:
+            best.append(r)
+        elif "Accumulation" in setup:
+            accumulation.append(r)
 
-        # numeric parse
-        score_val = format_score(score)
+    # ================= SORT =================
+    best.sort(key=lambda x: float(x.get("Score", 0)), reverse=True)
+    accumulation.sort(key=lambda x: float(x.get("Score", 0)), reverse=True)
 
+    has_data = False
+
+    # ================= ACC + UPTREND =================
+    if best:
+        has_data = True
+        msg += f"{SEPARATOR}<b>🔥 ACCUMULATION + UPTREND</b>\n"
+        for i, r in enumerate(best[:5], 1):
+            msg += format_stock_block(r, i)
+
+    # ================= SMART ACC =================
+    if accumulation:
+        has_data = True
+        msg += f"{SEPARATOR}<b>🟢 SMART ACCUMULATION</b>\n"
+        for i, r in enumerate(accumulation[:5], 1):
+            msg += format_stock_block(r, i)
+
+    # ================= EMPTY =================
+    if not has_data:
+        msg += "\n⚠️ Tidak ada setup valid hari ini\n"
+
+    # ================= NOTES =================
+    msg += SEPARATOR
+
+    if df_ihsg is not None:
         try:
-            gain_val = float(gain)
-        except Exception:
-            gain_val = 0
+            state, change_pct = get_market_condition(df_ihsg)
+            notes = generate_trading_notes(state, change_pct)
+        except:
+            notes = "⚠️ <b>Trading Notes</b>\n• Gagal membaca kondisi market"
+    else:
+        notes = "⚠️ <b>Trading Notes</b>\n• Data IHSG tidak tersedia"
 
-        # badges
-        score_badge = "⭐ " if score_val >= 80 else ""
-        gain_badge = "🚀 " if gain_val >= 8 else ""
+    msg += f"{notes}\n\n🤖 Cruzer AI - Swing Engine v2"
 
-        signal = derive_signal(score_val, trend, rsi, entry)
-        context = derive_context(score_val, trend)
-
-        tp1, tp2, tp3 = split_tp(tp_raw)
-
-        # ===== DESK STYLE BLOCK =====
-        lines.extend([
-            f"{idx}. <b>{kode}</b> ({harga}) | {score_badge}<b>Score:</b> {score_val}/100",
-            f"Setup       : 🎯 {setup}",
-            f"Context   : {context}",
-            f"Entry        : {entry}",
-            f"TP1          : {tp1}",
-            f"TP2          : {tp2}",
-            f"TP3          : {tp3}",
-            f"SL             : {sl}",
-            f"RR             : {gain_badge}+{gain_val}%",
-            f"Rec           : {signal}",
-            ""
-        ])
-
-    # ===== FOOTER =====
-    lines.append("⚠️ Trading Notes:")
-    lines.append("• Semua setup masih berada di fase konsolidasi, belum entry agresif.")
-    lines.append("• Prioritaskan entry saat harga mendekati area dengan konfirmasi volume.")
-    lines.append("• Jangan FOMO, lebih baik ketinggalan peluang daripada salah entry.")
-    lines.append("• Risk terkontrol > profit besar.")
-    lines.append("")
-    lines.append("🤖 Cruzer AI — Auto Screener System")
-
-    return "\n".join(lines)
+    return msg
 
 
+# ================= TELEGRAM SENDER =================
 def send_telegram_message(text: str) -> None:
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
     chat_id = os.getenv("TELEGRAM_CHAT_ID")

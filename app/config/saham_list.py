@@ -80,5 +80,5 @@ SAHAM_LIST = [
     "VERN", "VICI", "VICO", "VINS", "VISI", "VKTR", "VOKS", "VRNA", "VTNY", "WAPO", 
     "WBSA", "WEGE", "WEHA", "WGSH", "WIDI", "WIFI", "WIIM", "WINE", "WINS", "WIRG", 
     "WMUU", "WOMF", "WOOD", "WOWS", "WTON", "YELO", "YOII", "YPAS", "YULE", "YUPI", 
-    "ZATA", "ZONE", "ZYRX", "JKSE"
+    "ZATA", "ZONE", "ZYRX","^JKSE"
 ]
