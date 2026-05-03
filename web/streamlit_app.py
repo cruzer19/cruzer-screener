@@ -4,6 +4,9 @@
 import sys
 import os
 from datetime import date
+import pytz
+
+tz = pytz.timezone("Asia/Jakarta")
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT_DIR not in sys.path:
@@ -671,7 +674,7 @@ def render_screener():
                 st.session_state["best"] = df_best
                 st.session_state["accumulation"] = df_acc
 
-            st.session_state["time"] = datetime.now().strftime("%d %b %H:%M:%S")
+            st.session_state["time"] = datetime.now(tz).strftime("%d %b %H:%M:%S")
 
     # ================= DISPLAY =================
     if "mode" not in st.session_state:

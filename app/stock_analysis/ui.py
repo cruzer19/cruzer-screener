@@ -204,185 +204,183 @@ def render_stock_analysis():
     # ===================== ENTRY PLAN =====================
     st.subheader("🎯 Entry Plan")
 
-    if not supports_sorted:
+    # ================= BASIC DATA =================
+    last_price = df_price["CLOSE"].iloc[-1]
+
+    major_support = result.get("support")
+    minor_support = calc_minor_support(df_price)
+
+    # ================= MICRO SUPPORT =================
+    low_col = next((col for col in df_price.columns if "low" in col.lower()), None)
+
+    if low_col and len(df_price) >= 7:
+        micro_support = float(df_price[low_col].tail(7).min())
+    else:
+        micro_support = None
+
+    # ================= BUILD SUPPORT =================
+    supports = []
+
+    if micro_support is not None:
+        supports.append(("Micro", micro_support))
+    if minor_support is not None:
+        supports.append(("Minor", minor_support))
+    if major_support is not None:
+        supports.append(("Major", major_support))
+
+    if not supports:
         st.warning("Support tidak tersedia")
     else:
-        near_support = supports_sorted[0][1]
-
-        deep_support = (
-            supports_sorted[1][1]
-            if len(supports_sorted) > 1
-            else near_support
+        supports_sorted = sorted(
+            supports,
+            key=lambda x: abs(last_price - x[1])
         )
 
-        # ================= VOLATILITY =================
-        vol = df_price["CLOSE"].pct_change().std()
+        near_support = supports_sorted[0][1]
+        deep_support = supports_sorted[1][1] if len(supports_sorted) > 1 else near_support
 
-        # adapt multiplier (biar gak terlalu sempit / lebar)
-        if vol:
-            buffer = max(0.01, min(vol * 2, 0.04))
-        else:
-            buffer = 0.02
+        # ================= TICK =================
+        def round_to_tick(price):
+            if price < 200:
+                tick = 1
+            elif price < 500:
+                tick = 2
+            elif price < 2000:
+                tick = 5
+            elif price < 5000:
+                tick = 10
+            else:
+                tick = 25
+            return int(round(price / tick) * tick)
 
         # ================= ENTRY =================
-        entry_near_low = int(near_support * (1 - buffer))
-        entry_near_high = int(near_support * (1 + buffer * 1.5))
+        entry_near_low = round_to_tick(near_support * 0.99)
+        entry_near_high = round_to_tick(near_support * 1.01)
 
-        entry_deep_low = int(deep_support * (1 - buffer * 1.5))
-        entry_deep_high = int(deep_support * (1 + buffer))
+        entry_deep_low = round_to_tick(deep_support * 0.97)
+        entry_deep_high = round_to_tick(deep_support * 1.00)
 
-        # ================= RISK =================
-        sl = int(deep_support * 0.97)
-        risk_pct = ((last_price - sl) / last_price) * 100 if last_price else 0
+        sl = round_to_tick(deep_support * 0.97)
 
-        entry_df = pd.DataFrame(
-            {
-                "Parameter": [
-                    "Entry Near (Pullback)",
-                    "Entry Deep (Discount)",
-                    "Stop Loss",
-                    "Risk",
-                ],
-                "Value": [
-                    f"Rp {entry_near_low:,} – Rp {entry_near_high:,}".replace(",", "."),
-                    f"Rp {entry_deep_low:,} – Rp {entry_deep_high:,}".replace(",", "."),
-                    f"Rp {sl:,}".replace(",", "."),
-                    f"{risk_pct:.1f} %",
-                ],
-            }
-        )
+        risk_pct = ((last_price - sl) / last_price) * 100
+
+        def fmt(x):
+            return f"Rp {format_number(x)}"
+
+        entry_df = pd.DataFrame({
+            "Parameter": [
+                "Entry Near (Pullback)",
+                "Entry Deep (Discount)",
+                "Stop Loss",
+                "Risk",
+            ],
+            "Value": [
+                f"{fmt(entry_near_low)} – {fmt(entry_near_high)}",
+                f"{fmt(entry_deep_low)} – {fmt(entry_deep_high)}",
+                fmt(sl),
+                f"{risk_pct:.1f} %",
+            ]
+        })
 
         st.table(entry_df.set_index("Parameter"))
 
-        # ================= GAP ANALYSIS (FVG - CLEAN VERSION) =================
-        st.subheader("📊 Gap Analysis")
+    # ================= GAP ANALYSIS =================
+    st.subheader("📊 Gap Analysis")
 
-        df_gap = load_price_data(kode)
+    df_gap = load_price_data(kode)
+    df_gap = clean_price_df(df_gap)
 
-        if df_gap.empty:
-            st.warning("Data gap tidak tersedia")
+    if df_gap is None or df_gap.empty:
+        st.warning("Data gap tidak tersedia")
 
-        else:
-            import pandas as pd
+    else:
+        last_price = df_gap["CLOSE"].iloc[-1]
 
-            # ================= CLEAN COLUMN =================
-            df_gap.columns = [
-                c[0] if isinstance(c, tuple) else c
-                for c in df_gap.columns
-            ]
-            df_gap.columns = [str(c).upper() for c in df_gap.columns]
+        gaps = []
 
-            last_price = df_gap["CLOSE"].iloc[-1]
+        # ================= FVG DETECTION =================
+        for i in range(2, len(df_gap)):
+            c1_high = df_gap.iloc[i - 2]["HIGH"]
+            c1_low = df_gap.iloc[i - 2]["LOW"]
 
-            gaps = []
+            c3_high = df_gap.iloc[i]["HIGH"]
+            c3_low = df_gap.iloc[i]["LOW"]
 
-            # ================= FVG DETECTION =================
-            for i in range(2, len(df_gap)):
-                c1_high = df_gap.iloc[i - 2]["HIGH"]
-                c1_low = df_gap.iloc[i - 2]["LOW"]
+            date = df_gap.index[i]
 
-                c3_high = df_gap.iloc[i]["HIGH"]
-                c3_low = df_gap.iloc[i]["LOW"]
+            # Bullish gap
+            if c3_low > c1_high:
+                gap_low = c1_high
+                gap_high = c3_low
 
-                date = df_gap.index[i]
+                if (gap_high - gap_low) / gap_low > 0.015:
+                    gaps.append({"low": gap_low, "high": gap_high, "date": date})
 
-                # Bullish imbalance
-                if c3_low > c1_high:
-                    gap_low = c1_high
-                    gap_high = c3_low
+            # Bearish gap
+            elif c3_high < c1_low:
+                gap_low = c3_high
+                gap_high = c1_low
 
-                    size = (gap_high - gap_low) / gap_low
+                if (gap_high - gap_low) / gap_low > 0.015:
+                    gaps.append({"low": gap_low, "high": gap_high, "date": date})
 
-                    if size > 0.015:
-                        gaps.append({
-                            "low": gap_low,
-                            "high": gap_high,
-                            "date": date
-                        })
+        # ================= SORT & MERGE =================
+        gaps = sorted(gaps, key=lambda x: x["date"])
 
-                # Bearish imbalance
-                elif c3_high < c1_low:
-                    gap_low = c3_high
-                    gap_high = c1_low
+        merged = []
 
-                    size = (gap_high - gap_low) / gap_low
+        for g in gaps:
+            if not merged:
+                merged.append(g)
+                continue
 
-                    if size > 0.015:
-                        gaps.append({
-                            "low": gap_low,
-                            "high": gap_high,
-                            "date": date
-                        })
+            last = merged[-1]
 
-            # ================= SORT =================
-            gaps = sorted(gaps, key=lambda x: x["date"])
-
-            # ================= MERGE ZONE =================
-            merged = []
-
-            for g in gaps:
-                if not merged:
-                    merged.append(g)
-                    continue
-
-                last = merged[-1]
-
-                # merge kalau overlap / dekat
-                if abs(g["low"] - last["high"]) / last["high"] < 0.03:
-                    last["low"] = min(last["low"], g["low"])
-                    last["high"] = max(last["high"], g["high"])
-                    last["date"] = g["date"]
-                else:
-                    merged.append(g)
-
-            # ================= AMBIL 5 TERAKHIR =================
-            # ambil 10 terakhir dulu
-            gaps = merged[-10:]
-
-            # sort by distance (biar relevan)
-            gaps = sorted(
-                gaps,
-                key=lambda g: abs(((g["low"] + g["high"]) / 2) - last_price)
-            )
-
-            # ambil 3 terbaik
-            gaps = gaps[:3]
-
-            def fmt_price(x):
-                return f"Rp {int(x):,}".replace(",", ".")
-
-            def fmt_date(d):
-                return d.strftime("%d-%b-%Y")
-
-            rows = []
-
-            for g in reversed(gaps):
-                mid = (g["low"] + g["high"]) / 2
-
-                # ================= LABEL BERDASARKAN POSISI =================
-                if mid > last_price:
-                    label = "Gap Atas"
-                else:
-                    label = "Gap Bawah"
-
-                # ================= DISTANCE =================
-                dist = abs(mid - last_price) / last_price
-
-                rows.append((
-                    label,
-                    f"{fmt_price(g['low'])} – {fmt_price(g['high'])}",
-                    fmt_date(g["date"]),
-                    f"{dist*100:.1f}%"
-                ))
-
-            if rows:
-                gap_df = pd.DataFrame(
-                    rows,
-                    columns=["Type", "Range", "Tanggal", "Distance"]
-                )
-                st.table(gap_df.set_index("Type"))
+            if abs(g["low"] - last["high"]) / last["high"] < 0.03:
+                last["low"] = min(last["low"], g["low"])
+                last["high"] = max(last["high"], g["high"])
+                last["date"] = g["date"]
             else:
-                st.caption("Tidak ada gap signifikan")
+                merged.append(g)
+
+        # ================= AMBIL TERBAIK =================
+        gaps = merged[-10:]
+
+        gaps = sorted(
+            gaps,
+            key=lambda g: abs(((g["low"] + g["high"]) / 2) - last_price)
+        )[:3]
+
+        def fmt_price(x):
+            return f"Rp {format_number(round_to_tick(x))}"
+
+        def fmt_date(d):
+            return d.strftime("%d-%b-%Y")
+
+        rows = []
+
+        for g in gaps:
+            mid = (g["low"] + g["high"]) / 2
+
+            label = "Gap Atas" if mid > last_price else "Gap Bawah"
+
+            dist = abs(mid - last_price) / last_price
+
+            rows.append((
+                label,
+                f"{fmt_price(g['low'])} – {fmt_price(g['high'])}",
+                fmt_date(g["date"]),
+                f"{dist*100:.1f}%"
+            ))
+
+        if rows:
+            gap_df = pd.DataFrame(
+                rows,
+                columns=["Type", "Range", "Tanggal", "Distance"]
+            )
+            st.table(gap_df.set_index("Type"))
+        else:
+            st.caption("Tidak ada gap signifikan")
 
     # ================= SMART MONEY =================
     st.subheader("💰 Smart Money Flow (10D)")

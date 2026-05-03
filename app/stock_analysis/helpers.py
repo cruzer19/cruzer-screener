@@ -41,13 +41,7 @@ def calc_minor_support(df, lookback=12):
 # 🧼 CLEAN PRICE DATA
 # ==========================================================
 def clean_price_df(df):
-    """
-    Normalize dataframe:
-    - flatten multi index
-    - detect CLOSE column otomatis
-    - convert numeric
-    - sort index
-    """
+
     if df is None:
         return None
 
@@ -59,29 +53,36 @@ def clean_price_df(df):
     else:
         df.columns = [str(c).upper().strip() for c in df.columns]
 
-    # ===== DETECT CLOSE COLUMN =====
-    priority_cols = ["CLOSE", "ADJ CLOSE", "CLOSE PRICE"]
+    # ===== NORMALIZE OHLC =====
+    col_map = {}
 
-    close_col = None
-    for p in priority_cols:
-        for col in df.columns:
-            if p in col:
-                close_col = col
-                break
-        if close_col:
-            break
+    for col in df.columns:
+        c = col.upper()
 
-    if close_col is None:
+        if "OPEN" in c:
+            col_map[col] = "OPEN"
+        elif "HIGH" in c:
+            col_map[col] = "HIGH"
+        elif "LOW" in c:
+            col_map[col] = "LOW"
+        elif "CLOSE" in c:
+            col_map[col] = "CLOSE"
+
+    df = df.rename(columns=col_map)
+
+    # ===== VALIDATE =====
+    if "CLOSE" not in df.columns:
         return None
 
-    df = df.rename(columns={close_col: "CLOSE"})
-    df["CLOSE"] = pd.to_numeric(df["CLOSE"], errors="coerce")
+    # ===== NUMERIC =====
+    for col in ["OPEN", "HIGH", "LOW", "CLOSE"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
 
     df = df.dropna(subset=["CLOSE"])
     df = df.sort_index()
 
     return df
-
 
 # ==========================================================
 # 💰 FORMAT MONEY
