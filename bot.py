@@ -45,7 +45,7 @@ def is_market_open():
 
     afternoon_open = (
         now >= dtime(13, 30) and
-        now <= dtime(16, 0)
+        now <= dtime(19, 0)
     )
 
     return morning_open or afternoon_open

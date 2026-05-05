@@ -26,6 +26,7 @@ import pandas as pd
 import numpy as np
 
 from app.core.engine import ScreenerEngine
+from app.core.scanner_bsjp import scan_bsjp
 from app.config.saham_list import SAHAM_LIST
 from app.config.saham_profile import SAHAM_PROFILE
 from app.config.dividend_list import DIVIDEND_LIST
@@ -638,7 +639,11 @@ def render_screener():
     # ================= SELECT TYPE =================
     screener_type = st.selectbox(
         "Pilih Tipe",
-        ["Swing Trade (Day)", "Swing Trade (Week)"]
+        [
+            "Swing Trade (Day)",
+            "Swing Trade (Week)",
+            "Beli Sore Jual Pagi (BSJP)"
+        ]
     )
 
     # ================= INIT STATE =================
@@ -660,6 +665,16 @@ def render_screener():
                 st.session_state["scanner_state"] = state
                 st.session_state["mode"] = "day"
                 st.session_state["data"] = df
+
+
+            elif screener_type == "Beli Sore Jual Pagi (BSJP)":
+
+                df, alerts, state = scan_bsjp(st.session_state["scanner_state"])
+
+                st.session_state["scanner_state"] = state
+                st.session_state["mode"] = "bsjp"
+                st.session_state["data"] = df
+
 
             else:
                 df_best = pd.DataFrame()
@@ -691,9 +706,22 @@ def render_screener():
         else:
             st.dataframe(df, use_container_width=True)
 
+
+    elif st.session_state["mode"] == "bsjp":
+
+        st.subheader("🎯 BSJP SETUP (BUY SORE JUAL PAGI)")
+
+        df = st.session_state.get("data", pd.DataFrame())
+
+        if df.empty:
+            st.warning("📭 Tidak ada kandidat BSJP")
+        else:
+            st.dataframe(df, use_container_width=True)
+
+
     else:
 
-        # 🔥 BEST SETUP (UPDATED)
+        # 🔥 BEST SETUP
         st.subheader("🔥 ACCUMULATION + UPTREND (BEST)")
 
         df_best = st.session_state.get("best", pd.DataFrame())
