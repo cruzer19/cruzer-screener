@@ -548,7 +548,7 @@ def scan_week(min_price=None, max_price=None):
     engine = ScreenerEngine()
 
     results = engine.run(
-        SAHAM_LIST[:810],
+        SAHAM_LIST[:850],
         "swing_trade_week"
     )
 
@@ -1762,7 +1762,7 @@ maka support terdekat berpotensi:
 - atau terjadi reversal lebih dalam
 
 Karena weak trend biasanya:
-> lebih mudah breakdown dibanding continuation.
+> lebih mudah breakdown dibanding rebound kuat.
 
 ### Entry
 - Idealnya entry dilakukan:
