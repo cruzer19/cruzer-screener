@@ -1874,8 +1874,8 @@ menu = st.sidebar.radio(
     "📂 Menu",
     [
         "🔍 Screener",
-        "📊 Stock Analysis",
         "📘 Strategy Guide",
+        "📊 Stock Analysis",
         "💰 Dividend Screener",
         "📒 Trading Tracker - Summary",
         "⚙️ Trading Tracker - Manage"
