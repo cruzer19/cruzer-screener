@@ -14,10 +14,6 @@ from .engine import (
     get_entry_plan
 )
 
-from app.screeners.swing_trade_day import calculate_fast_trade_score
-from app.screeners.swing_trade_week import calculate_swing_trade_score
-from app.core.scanner_bsjp import calculate_bsjp_score
-
 from app.utils.news_engine import fetch_stock_news
 from app.utils.market_data import load_price_data
 from app.renderers.telegram_stock_analysis import render_stock_analysis_message
@@ -58,12 +54,6 @@ def render_stock_analysis():
             "news_result",
             "analyzed",
 
-            # ================= SCORE =================
-
-            "fast_score",
-            "swing_score",
-            "bsjp_score",
-
         ]:
 
             st.session_state.pop(k, None)
@@ -103,26 +93,6 @@ def render_stock_analysis():
             result["minor_support"] = calc_minor_support(df)
 
             # ==========================================================
-            # MULTI STRATEGY SCORE
-            # ==========================================================
-
-            fast_score = calculate_fast_trade_score(df)
-
-            swing_score = calculate_swing_trade_score(df)
-
-            bsjp_score = calculate_bsjp_score(df)
-
-            # ==========================================================
-            # DEBUG
-            # ==========================================================
-
-            print(f"FAST SCORE : {fast_score}")
-
-            print(f"SWING SCORE : {swing_score}")
-
-            print(f"BSJP SCORE : {bsjp_score}")
-
-            # ==========================================================
             # NEWS
             # ==========================================================
 
@@ -138,22 +108,10 @@ def render_stock_analysis():
 
             st.session_state["news_result"] = news_result
 
-            st.session_state["fast_score"] = fast_score
-
-            st.session_state["swing_score"] = swing_score
-
-            st.session_state["bsjp_score"] = bsjp_score
-
     if "analysis_result" not in st.session_state:
         return
 
     result = st.session_state["analysis_result"]
-
-    fast_score = st.session_state.get("fast_score", 0)
-
-    swing_score = st.session_state.get("swing_score", 0)
-
-    bsjp_score = st.session_state.get("bsjp_score", 0)
 
     df_price = clean_price_df(st.session_state["analysis_df"])
     news_result = st.session_state.get("news_result", {})
@@ -209,141 +167,6 @@ def render_stock_analysis():
         fv_status = "-"
 
     st.markdown(f"**Status: {fv_status}**")
-
-    # ==========================================================
-    # 📊 MULTI STRATEGY SCORE
-    # ==========================================================
-
-    st.subheader("📊 Multi Strategy Score")
-
-    # ================= LOAD SCORE =================
-
-    fast_score = st.session_state.get(
-        "fast_score",
-        0
-    )
-
-    swing_score = st.session_state.get(
-        "swing_score",
-        0
-    )
-
-    bsjp_score = st.session_state.get(
-        "bsjp_score",
-        0
-    )
-
-    # ================= SMART MONEY =================
-
-    sm_result = calculate_smart_money(df_price)
-
-    if sm_result:
-
-        smart_score = int(
-            max(
-                0,
-                min(
-                    sm_result["summary"]["power"],
-                    100
-                )
-            )
-        )
-
-    else:
-
-        smart_score = 0
-
-    # ================= OVERALL SCORE =================
-
-    overall_score = int(
-
-        (
-            fast_score * 0.35 +
-            swing_score * 0.35 +
-            bsjp_score * 0.20 +
-            smart_score * 0.10
-        )
-
-    )
-
-    # ================= LABEL =================
-
-    def score_label(score):
-
-        if score >= 90:
-            return "🔥 Monster"
-
-        elif score >= 80:
-            return "🚀 Strong"
-
-        elif score >= 70:
-            return "⚡ Good"
-
-        elif score >= 60:
-            return "👀 Watchlist"
-
-        else:
-            return "❌ Weak"
-
-    # ================= AI STYLE =================
-
-    if fast_score >= 85 and swing_score < 70:
-
-        ai_style = "🔥 Speculative Momentum"
-
-    elif swing_score >= 80 and fast_score >= 70:
-
-        ai_style = "📈 Healthy Trend"
-
-    elif bsjp_score >= 80 and fast_score >= 80:
-
-        ai_style = "🚀 Breakout Momentum"
-
-    elif overall_score >= 80:
-
-        ai_style = "💰 Strong Accumulation"
-
-    else:
-
-        ai_style = "👀 Mixed Setup"
-
-    # ================= TABLE =================
-
-    score_df = pd.DataFrame({
-
-        "Strategy": [
-
-            "⚡ Fast Trade",
-            "📈 Swing Trade",
-            "🚀 BSJP",
-            "💰 Smart Money",
-            "🧠 Overall",
-        ],
-
-        "Score": [
-
-            fast_score,
-            swing_score,
-            bsjp_score,
-            smart_score,
-            overall_score,
-        ],
-
-        "Status": [
-
-            score_label(fast_score),
-            score_label(swing_score),
-            score_label(bsjp_score),
-            score_label(smart_score),
-            score_label(overall_score),
-        ]
-    })
-
-    st.table(
-        score_df.set_index("Strategy")
-    )
-
-    st.info(ai_style)
 
     # ===================== SUPPORT & RESISTANCE =====================
     st.subheader("📉 Support & Resistance")
@@ -636,7 +459,6 @@ def render_stock_analysis():
             f"{'⬆️' if summary['trend_up'] else '⬇️'}"
         )
 
-
         # ===================== CYCLE PROJECTION (SMART + ADAPTIVE) =====================
         st.subheader("📅 Cycle Projection")
 
@@ -644,31 +466,63 @@ def render_stock_analysis():
         cycle = result.get("cycle") if "result" in locals() else None
 
         if not cycle:
+
             st.warning("Data cycle tidak tersedia")
 
         else:
-            import pandas as pd
 
-            # ===================== HELPER =====================
+            import pandas as pd
+            from datetime import timedelta
+
+            # ==========================================================
+            # HELPER
+            # ==========================================================
+
             def safe_date(key):
+
                 try:
-                    return datetime.strptime(cycle.get(key, ""), "%Y-%m-%d").date()
+
+                    return datetime.strptime(
+                        cycle.get(key, ""),
+                        "%Y-%m-%d"
+                    ).date()
+
                 except:
+
                     return None
 
             def fmt(d):
-                return d.strftime("%d-%b-%Y") if d else "-"
+
+                return (
+                    d.strftime("%d-%b-%Y")
+                    if d else "-"
+                )
 
             def fmt_range(s, e):
-                return f"{fmt(s)} - {fmt(e)}"
+
+                return (
+                    f"{fmt(s)} - {fmt(e)}"
+                )
 
             def days_to(d):
-                return (d - today).days if d else None
+
+                return (
+                    (d - today).days
+                    if d else None
+                )
 
             def in_range(start, end):
-                return start and end and start <= today <= end
 
-            # ===================== PARSE =====================
+                return (
+                    start
+                    and end
+                    and start <= today <= end
+                )
+
+            # ==========================================================
+            # PARSE CYCLE
+            # ==========================================================
+
             last_low = safe_date("last_low")
 
             near_low_start = safe_date("next_low_start")
@@ -683,152 +537,575 @@ def render_stock_analysis():
             next_high_start = safe_date("second_high_start")
             next_high_end = safe_date("second_high_end")
 
-            # ===================== ADVANCED TREND DETECTION =====================
-            df_price = st.session_state.get("analysis_df")
-
-            if df_price is not None:
-                df_price.columns = [
-                    c[0] if isinstance(c, tuple) else c
-                    for c in df_price.columns
-                ]
-                df_price.columns = [str(c).upper() for c in df_price.columns]
+            # ==========================================================
+            # DEFAULT
+            # ==========================================================
 
             trend_mode = "sideways"
 
-            if df_price is not None and len(df_price) > 50:
+            atr_pct = 0
+
+            cycle_confidence = 0
+
+            # ==========================================================
+            # LOAD PRICE DATA
+            # ==========================================================
+
+            df_price = st.session_state.get(
+                "analysis_df"
+            )
+
+            if df_price is not None:
+
+                df_price.columns = [
+
+                    c[0]
+                    if isinstance(c, tuple)
+                    else c
+
+                    for c in df_price.columns
+                ]
+
+                df_price.columns = [
+
+                    str(c).upper()
+
+                    for c in df_price.columns
+                ]
+
+            # ==========================================================
+            # MAIN ENGINE
+            # ==========================================================
+
+            if (
+                df_price is not None
+                and len(df_price) > 50
+            ):
 
                 close = df_price["CLOSE"]
+
                 high = df_price["HIGH"]
+
                 low = df_price["LOW"]
+
                 volume = df_price["VOLUME"]
 
                 ma20 = close.rolling(20).mean()
+
                 ma50 = close.rolling(50).mean()
 
-                last_price = close.iloc[-1]
+                last_price = float(
+                    close.iloc[-1]
+                )
 
-                # ================= STRUCTURE =================
-                hh = high.iloc[-1] >= high.tail(20).max() * 0.98
-                hl = low.iloc[-1] > low.tail(20).min()
+                # ======================================================
+                # STRUCTURE
+                # ======================================================
 
-                # ================= MOMENTUM =================
-                momentum = (last_price - close.iloc[-10]) / close.iloc[-10]
+                hh = (
+                    high.iloc[-1]
+                    >= high.tail(20).max() * 0.98
+                )
 
-                # ================= VOLUME =================
-                vol_ratio = volume.iloc[-1] / volume.tail(20).mean()
+                hl = (
+                    low.iloc[-1]
+                    > low.tail(20).min()
+                )
 
-                # ================= STRONG TREND =================
+                # ======================================================
+                # MOMENTUM
+                # ======================================================
+
+                momentum = (
+                    (
+                        last_price
+                        - close.iloc[-10]
+                    )
+                    / max(close.iloc[-10], 1)
+                )
+
+                # ======================================================
+                # VOLUME
+                # ======================================================
+
+                vol_ratio = (
+                    volume.iloc[-1]
+                    / max(
+                        volume.tail(20).mean(),
+                        1
+                    )
+                )
+
+                # ======================================================
+                # ATR
+                # ======================================================
+
+                atr_pct = (
+                    (
+                        high.tail(14).max()
+                        - low.tail(14).min()
+                    )
+                    / max(last_price, 1)
+                ) * 100
+
+                # ======================================================
+                # TREND MODE
+                # ======================================================
+
                 if (
+
                     last_price > ma50.iloc[-1]
                     and momentum > 0.07
+
                 ):
+
                     trend_mode = "strong_up"
 
-                # ================= SPECULATIVE MOVE =================
-                if (
+                elif (
+
                     momentum > 0.20
                     and vol_ratio > 2
                     and last_price > ma20.iloc[-1]
+
                 ):
+
                     trend_mode = "speculative"
 
-                # ================= NORMAL TREND =================
                 elif last_price > ma50.iloc[-1]:
+
                     trend_mode = "up"
 
                 elif last_price < ma50.iloc[-1]:
+
                     trend_mode = "down"
 
-            # ===================== CURRENT POSITION =====================
-            if in_range(near_low_start, near_low_end):
+                # ======================================================
+                # VOLATILITY ADAPTIVE WINDOW
+                # ======================================================
 
-                if trend_mode in ["strong_up", "speculative"]:
-                    st.warning("⚠️ Cycle Low (Low Confidence)")
+                if atr_pct >= 20:
 
-                else:
-                    st.success("🟢 Near Cycle Low")
+                    window_expand = 5
 
-            elif in_range(near_high_start, near_high_end):
+                elif atr_pct >= 10:
 
-                if trend_mode in ["strong_up", "speculative"]:
-                    st.info("📈 Near Cycle High (Trend Continuation)")
+                    window_expand = 3
 
                 else:
-                    st.warning("🔴 Near Cycle High")
+
+                    window_expand = 1
+
+                # ======================================================
+                # EXPAND WINDOW
+                # ======================================================
+
+                for name in [
+
+                    "near_low_start",
+                    "near_low_end",
+                    "next_low_start",
+                    "next_low_end",
+                    "near_high_start",
+                    "near_high_end",
+                    "next_high_start",
+                    "next_high_end",
+
+                ]:
+
+                    value = locals().get(name)
+
+                    if value:
+
+                        if "start" in name:
+
+                            locals()[name] = (
+                                value
+                                - timedelta(
+                                    days=window_expand
+                                )
+                            )
+
+                        else:
+
+                            locals()[name] = (
+                                value
+                                + timedelta(
+                                    days=window_expand
+                                )
+                            )
+
+                # ======================================================
+                # VENUS SYNODIC
+                # ======================================================
+
+                venus_alignment = cycle.get(
+                    "venus_alignment",
+                    False
+                )
+
+                if venus_alignment:
+
+                    cycle_confidence += 15
+
+                # ======================================================
+                # SUN JUPITER
+                # ======================================================
+
+                sun_jupiter_alignment = cycle.get(
+                    "sun_jupiter_alignment",
+                    False
+                )
+
+                if sun_jupiter_alignment:
+
+                    if trend_mode in [
+                        "strong_up",
+                        "up"
+                    ]:
+
+                        cycle_confidence += 15
+
+                    else:
+
+                        cycle_confidence += 5
+
+                # ======================================================
+                # TIME GEOMETRY
+                # ======================================================
+
+                geometry_score = cycle.get(
+                    "geometry_score",
+                    0
+                )
+
+                cycle_confidence += geometry_score
+
+                # ======================================================
+                # TREND QUALITY
+                # ======================================================
+
+                if trend_mode == "up":
+
+                    cycle_confidence += 15
+
+                elif trend_mode == "strong_up":
+
+                    cycle_confidence += 5
+
+                elif trend_mode == "sideways":
+
+                    cycle_confidence += 15
+
+                elif trend_mode == "down":
+
+                    cycle_confidence -= 10
+
+                # ======================================================
+                # MOMENTUM QUALITY
+                # ======================================================
+
+                if 0.03 <= momentum <= 0.15:
+
+                    cycle_confidence += 10
+
+                elif momentum > 0.20:
+
+                    cycle_confidence -= 12
+
+                # ======================================================
+                # VOLATILITY QUALITY
+                # ======================================================
+
+                if 8 <= atr_pct <= 20:
+
+                    cycle_confidence += 15
+
+                elif atr_pct > 30:
+
+                    cycle_confidence -= 10
+
+                # ======================================================
+                # STRUCTURE QUALITY
+                # ======================================================
+
+                if hh and hl:
+
+                    cycle_confidence += 10
+
+                # ======================================================
+                # CLEAN VOLUME
+                # ======================================================
+
+                if 1.2 <= vol_ratio <= 2.5:
+
+                    cycle_confidence += 5
+
+                # ======================================================
+                # MA20 POSITION
+                # ======================================================
+
+                distance_ma20 = (
+                    (
+                        last_price
+                        - ma20.iloc[-1]
+                    )
+                    / max(ma20.iloc[-1], 1)
+                ) * 100
+
+                if abs(distance_ma20) <= 3:
+
+                    cycle_confidence += 10
+
+                elif distance_ma20 >= 10:
+
+                    cycle_confidence -= 10
+
+                # ======================================================
+                # CYCLE POSITION BONUS
+                # ======================================================
+
+                days_to_low = days_to(near_low_start)
+
+                if (
+                    days_to_low is not None
+                    and 0 <= days_to_low <= 10
+                ):
+                    cycle_confidence += 20
+
+                if in_range(
+                    near_high_start,
+                    near_high_end
+                ):
+
+                    cycle_confidence -= 10
+
+                # ======================================================
+                # NORMALIZE
+                # ======================================================
+
+                cycle_confidence = int(
+
+                    max(
+                        0,
+                        min(
+                            cycle_confidence,
+                            100
+                        )
+                    )
+                )
+
+            # ==========================================================
+            # METRICS
+            # ==========================================================
+
+            c1, c2, c3 = st.columns(3)
+
+            c1.metric(
+                "Cycle Confidence",
+                f"{cycle_confidence}%"
+            )
+
+            c2.metric(
+                "Trend Mode",
+                trend_mode
+                .replace("_", " ")
+                .title()
+            )
+
+            c3.metric(
+                "Volatility",
+                f"{atr_pct:.1f}%"
+            )
+
+            # ==========================================================
+            # CURRENT POSITION
+            # ==========================================================
+
+            if in_range(
+                near_low_start,
+                near_low_end
+            ):
+
+                if cycle_confidence >= 80:
+
+                    st.success(
+                        "🟢 High Probability Cycle Low"
+                    )
+
+                elif cycle_confidence >= 65:
+
+                    st.info(
+                        "⚖️ Medium Confidence Cycle Low"
+                    )
+
+                else:
+
+                    st.warning(
+                        "⚠️ Weak Cycle Low Alignment"
+                    )
+
+            elif in_range(
+                near_high_start,
+                near_high_end
+            ):
+
+                if trend_mode in [
+                    "strong_up",
+                    "speculative"
+                ]:
+
+                    st.info(
+                        "📈 Trend Continuation Zone"
+                    )
+
+                else:
+
+                    st.warning(
+                        "🔴 Near Cycle High"
+                    )
 
             else:
+
                 events = [
-                    ("Cycle Low", near_low_start),
-                    ("Cycle High", near_high_start),
-                    ("Next Cycle Low", next_low_start),
-                    ("Next Cycle High", next_high_start),
+
+                    (
+                        "Cycle Low",
+                        near_low_start
+                    ),
+
+                    (
+                        "Cycle High",
+                        near_high_start
+                    ),
+
+                    (
+                        "Next Cycle Low",
+                        next_low_start
+                    ),
+
+                    (
+                        "Next Cycle High",
+                        next_high_start
+                    ),
                 ]
 
-                future_events = [(n, d) for n, d in events if d and d >= today]
+                future_events = [
+
+                    (n, d)
+
+                    for n, d in events
+
+                    if d and d >= today
+                ]
 
                 if future_events:
+
                     name, date_event = min(
+
                         future_events,
-                        key=lambda x: (x[1] - today).days
+
+                        key=lambda x: (
+                            x[1] - today
+                        ).days
                     )
 
                     d = days_to(date_event)
 
                     if "Low" in name:
-                        if trend_mode in ["strong_up", "speculative"]:
-                            st.info(f"⏳ {name} ({d} hari lagi)")
 
-                        else:
-                            st.info(f"⏳ Menuju {name} ({d} hari lagi)")
+                        st.info(
+                            f"⏳ {name} ({d} hari lagi)"
+                        )
 
                     else:
-                        st.info(f"📈 Menuju {name} ({d} hari lagi)")
+
+                        st.info(
+                            f"📈 {name} ({d} hari lagi)"
+                        )
 
                 else:
-                    st.caption("⚖️ Tidak ada event cycle ke depan")
 
-            # ===================== TABLE =====================
-            st.markdown("### 📉 Cycle Low Window")
+                    st.caption(
+                        "⚖️ Tidak ada event cycle ke depan"
+                    )
+
+            # ==========================================================
+            # LOW WINDOW TABLE
+            # ==========================================================
+
+            st.markdown(
+                "### 📉 Cycle Low Window"
+            )
 
             low_df = pd.DataFrame({
+
                 "Parameter": [
+
                     "Last Major Low",
+
                     "Near Cycle Low",
+
                     "Next Cycle Low",
                 ],
+
                 "Value": [
+
                     fmt(last_low),
-                    fmt_range(near_low_start, near_low_end),
-                    fmt_range(next_low_start, next_low_end),
+
+                    fmt_range(
+                        near_low_start,
+                        near_low_end
+                    ),
+
+                    fmt_range(
+                        next_low_start,
+                        next_low_end
+                    ),
                 ],
             })
 
-            st.table(low_df.set_index("Parameter"))
+            st.table(
+                low_df.set_index(
+                    "Parameter"
+                )
+            )
 
-            st.markdown("### 📈 Cycle High Window")
+            # ==========================================================
+            # HIGH WINDOW TABLE
+            # ==========================================================
+
+            st.markdown(
+                "### 📈 Cycle High Window"
+            )
 
             high_df = pd.DataFrame({
+
                 "Parameter": [
+
                     "Near High Window",
+
                     "Next High Window",
                 ],
+
                 "Value": [
-                    fmt_range(near_high_start, near_high_end),
-                    fmt_range(next_high_start, next_high_end),
+
+                    fmt_range(
+                        near_high_start,
+                        near_high_end
+                    ),
+
+                    fmt_range(
+                        next_high_start,
+                        next_high_end
+                    ),
                 ],
             })
 
-            st.table(high_df.set_index("Parameter"))
-
-            # ===================== CONFIDENCE =====================
-            if trend_mode == "speculative":
-                st.caption("🚀 Market mode: High Momentum (cycle less reliable)")
-            elif trend_mode == "strong_up":
-                st.caption("⚠️ Cycle reliability: LOW (strong trend)")
-            elif trend_mode in ["up", "down"]:
-                st.caption("⚖️ Cycle reliability: MEDIUM")
-            else:
-                st.caption("🟢 Cycle reliability: HIGH (sideways)")
+            st.table(
+                high_df.set_index(
+                    "Parameter"
+                )
+            )
 
     # ================= NEWS =================
     st.subheader("📰 News & Sentiment")
