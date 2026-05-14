@@ -1640,6 +1640,234 @@ def render_manage_data():
                 st.rerun()
 
 # ==========================================================
+# =================== STRATEGY GUIDE =======================
+# ==========================================================
+
+def render_strategy_guide():
+
+    st.header("📘 Trading Strategy Guide")
+
+    st.caption(
+        "Panduan penggunaan strategy, "
+        "timing screener, dan manajemen risiko."
+    )
+
+    # ======================================================
+    # ARA HUNTER
+    # ======================================================
+
+    st.subheader("🚀 ARA Hunter")
+
+    st.markdown("""
+
+### Deskripsi
+Strategi momentum agresif untuk mencari saham yang berpotensi lanjut ARA atau breakout kuat saat market baru buka.
+
+### Cara Menjalankan
+- Jalankan sekitar jam **09.05 – 09.20 pagi**
+- Fokus ke **1–2 saham** dengan:
+  - score tinggi
+  - volume besar
+  - momentum paling kuat
+
+### Entry
+- Bisa entry dengan cara nyicil mengikuti momentum
+- Jika harga pullback, boleh lanjut cicil di area support terdekat
+
+### Risk Management
+- **TP:** sekitar **5–7%**
+- **SL:** sekitar **6–8%**
+
+### Karakter
+- High risk
+- High volatility
+- Cocok saat market bullish dan ramai momentum
+
+""")
+
+    st.divider()
+
+    # ======================================================
+    # SWING TRADE
+    # ======================================================
+
+    st.subheader("📈 Swing Trade (Day–Week)")
+
+    st.markdown("""
+
+### Deskripsi
+Strategi swing trading untuk mencari saham dengan trend yang masih sehat, momentum kuat, dan potensi continuation dalam beberapa hari hingga beberapa minggu.
+
+Fokus utama strategi ini:
+- trend bullish sehat
+- pullback / rebound
+- continuation setup
+- smart money accumulation
+- cycle timing
+
+### Cara Menjalankan
+- Jalankan screener sekitar jam **00.00 – 09.00 pagi** sebelum market buka
+- Pilih **1–3 saham** dengan:
+  - score tinggi
+  - volume besar
+  - liquidity bagus
+  - atau saham favorit untuk dianalisa lebih dalam
+
+### Analisa Tambahan
+Setelah kandidat ditemukan, lakukan analisa lanjutan menggunakan:
+- menu **Stock Analysis**
+- chart pribadi
+- atau analisa discretionary tambahan
+
+Beberapa hal yang perlu diperhatikan:
+- Status trend
+- Support & resistance
+- Gap analysis
+- Smart money
+- Cycle projection
+- Volume & volatility
+- Risk / reward area
+
+### Ketentuan Penting
+
+#### 📈 Overvalued tapi Trend Masih Kuat
+Jika saham sudah:
+- cukup tinggi / extended
+- dekat resistance
+- atau mulai overvalued
+
+tetapi:
+- trend masih sangat kuat
+- volume tetap sehat
+- smart money masih masuk
+- momentum belum melemah
+
+maka resistance masih berpotensi:
+- ditembus
+- atau terjadi continuation breakout
+
+Karena dalam strong trend:
+> harga bisa tetap naik lebih lama dari ekspektasi market.
+
+#### 📉 Overbought + Trend Melemah
+Sebaliknya, jika saham:
+- sudah overbought
+- volume mulai melemah
+- momentum turun
+- gagal membuat higher high
+- atau smart money mulai keluar
+
+maka support terdekat berpotensi:
+- jebol
+- atau terjadi reversal lebih dalam
+
+Karena weak trend biasanya:
+> lebih mudah breakdown dibanding continuation.
+
+### Entry
+- Idealnya entry dilakukan:
+  - dekat support
+  - saat pullback sehat
+  - atau saat rebound mulai terkonfirmasi
+
+- Hindari entry terlalu jauh dari support jika momentum mulai melemah
+
+### Risk Management
+- **TP:** fleksibel mengikuti resistance dan trend strength
+- **SL:** idealnya di bawah support terdekat atau invalidation area
+
+### Karakter
+- Medium risk
+- Cocok untuk posisi beberapa hari hingga mingguan
+- Lebih fleksibel dibanding ARA Hunter
+- Lebih fokus ke probability dan kualitas trend
+
+""")
+
+    st.divider()
+
+    # ======================================================
+    # BSJP SCENARIO 1
+    # ======================================================
+
+    st.subheader("🌙 BSJP — Skenario 1 (Freeze Time)")
+
+    st.markdown("""
+
+### Deskripsi
+Strategi mencari saham yang masih diakumulasi menjelang market tutup dan berpotensi gap up keesokan harinya.
+
+### Cara Menjalankan
+
+#### Sesi Pertama
+- Jalankan screener jam **15.15 – 15.30**
+- Pilih **1–3 saham** dengan:
+  - score tinggi
+  - volume besar
+  - buy pressure kuat
+
+#### Sesi Konfirmasi
+- Jalankan ulang screener jam **15.50 – 16.00**
+- Fokus pada saham yang muncul kembali di screener
+
+### Entry
+- Entry saat freeze time sekitar **15.50 – 16.00**
+- Pasang buy sekitar **2–3 tick di atas harga terakhir**
+
+### Exit Plan
+- Besok pagi langsung pasang:
+  - **TP sekitar 5–7%**
+  - **SL sekitar 6–8%**
+
+### Karakter
+- Overnight setup
+- Mengandalkan closing accumulation
+- Cocok untuk market bullish atau sideways bullish
+
+""")
+
+    st.divider()
+
+    # ======================================================
+    # BSJP SCENARIO 2
+    # ======================================================
+
+    st.subheader("🌅 BSJP — Skenario 2 (Pre-Market Setup)")
+
+    st.markdown("""
+
+### Deskripsi
+Strategi overnight sebelum market buka dengan fokus pada saham yang masih memiliki potensi continuation.
+
+### Cara Menjalankan
+- Jalankan screener sekitar jam **00.00 – 09.00 pagi**
+- Pilih **1–2 saham** dengan:
+  - score tinggi
+  - volume kuat
+  - setup paling bersih
+
+### Entry
+- Entry langsung dengan:
+  - Buy
+  - TP
+  - SL sekaligus
+
+### Risk Management
+- **TP:** sekitar **5–7%**
+- **SL:** sekitar **6–8%**
+
+### Exit Plan
+- Full TP langsung
+- Atau TP bertahap maksimal 2 tahap
+
+### Karakter
+- Lebih konservatif dibanding ARA Hunter
+- Cocok untuk continuation swing pendek
+- Lebih nyaman untuk trader yang tidak ingin terlalu agresif intraday
+
+""")
+
+# ==========================================================
 # ======================= ROUTER ===========================
 # ==========================================================
 menu = st.sidebar.radio(
@@ -1647,6 +1875,7 @@ menu = st.sidebar.radio(
     [
         "🔍 Screener",
         "📊 Stock Analysis",
+        "📘 Strategy Guide",
         "💰 Dividend Screener",
         "📒 Trading Tracker - Summary",
         "⚙️ Trading Tracker - Manage"
@@ -1661,6 +1890,9 @@ elif menu == "📊 Stock Analysis":
 
 elif menu == "💰 Dividend Screener":
     render_dividend_screener()
+
+elif menu == "📘 Strategy Guide":
+    render_strategy_guide()
 
 elif menu == "📒 Trading Tracker - Summary":
     render_trading_summary()

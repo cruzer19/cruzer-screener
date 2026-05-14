@@ -898,21 +898,16 @@ def render_stock_analysis():
             # METRICS
             # ==========================================================
 
-            c1, c2, c3 = st.columns(3)
+            c1, c2 = st.columns(2)
 
             c1.metric(
-                "Cycle Confidence",
-                f"{cycle_confidence}%"
-            )
-
-            c2.metric(
                 "Trend Mode",
                 trend_mode
                 .replace("_", " ")
                 .title()
             )
 
-            c3.metric(
+            c2.metric(
                 "Volatility",
                 f"{atr_pct:.1f}%"
             )
