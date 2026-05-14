@@ -155,7 +155,7 @@ def scan_day(state=None):
             score = max(0, min(95, int(score)))
 
             if open_low_flag:
-                status_display = f"{status_display} + 🚀 Open Low"
+                status_display = f"{status_display}"
             else:
                 status_display = status
 

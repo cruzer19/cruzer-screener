@@ -181,3 +181,300 @@ def scan_bsjp(state=None):
     print(f"ALERT: {len(alerts)}\n")
 
     return df, alerts, state
+
+# ==========================================================
+# 📊 SINGLE STOCK BSJP SCORE
+# ==========================================================
+
+def calculate_bsjp_score(df):
+
+    """
+    BSJP Score untuk Stock Analysis UI
+    """
+
+    try:
+
+        # ======================================================
+        # VALIDATION
+        # ======================================================
+
+        if df is None or len(df) < 30:
+            return 0
+
+        # ======================================================
+        # NORMALIZE COLUMN
+        # ======================================================
+
+        df = df.copy()
+
+        df.columns = [
+            str(c).strip().lower()
+            for c in df.columns
+        ]
+
+        # ======================================================
+        # DATA
+        # ======================================================
+
+        close = df["close"]
+
+        open_price = df["open"]
+
+        high = df["high"]
+
+        low = df["low"]
+
+        volume = df["volume"]
+
+        # ======================================================
+        # LAST VALUE
+        # ======================================================
+
+        last_close = float(close.iloc[-1])
+
+        prev_close = float(close.iloc[-2])
+
+        last_open = float(open_price.iloc[-1])
+
+        last_high = float(high.iloc[-1])
+
+        vol_last = float(volume.iloc[-1])
+
+        # ======================================================
+        # MOVING AVERAGE
+        # ======================================================
+
+        ma5 = close.rolling(5).mean()
+
+        ma20 = close.rolling(20).mean()
+
+        ma5_last = float(ma5.iloc[-1])
+
+        ma20_last = float(ma20.iloc[-1])
+
+        # ======================================================
+        # VOLUME
+        # ======================================================
+
+        vol_ma20 = volume.rolling(20).mean()
+
+        vol_ma20_last = float(
+            vol_ma20.iloc[-1]
+        )
+
+        vol_ratio = (
+            vol_last /
+            max(vol_ma20_last, 1)
+        )
+
+        # ======================================================
+        # RESISTANCE
+        # ======================================================
+
+        resistance = high.tail(20).max()
+
+        breakout_distance = (
+            (resistance - last_close)
+            / max(last_close, 1)
+        ) * 100
+
+        # ======================================================
+        # PRICE ACTION
+        # ======================================================
+
+        return_pct = (
+            (last_close - prev_close)
+            / max(prev_close, 1)
+        ) * 100
+
+        body_pct = (
+            abs(last_close - last_open)
+            / max(last_open, 1)
+        ) * 100
+
+        close_near_high = (
+            (last_high - last_close)
+            / max(last_high, 1)
+        ) * 100
+
+        distance_ma20 = (
+            (last_close - ma20_last)
+            / max(ma20_last, 1)
+        ) * 100
+
+        # ======================================================
+        # BASE SCORE
+        # ======================================================
+
+        score = 50
+
+        # ======================================================
+        # BREAKOUT DISTANCE
+        # ======================================================
+
+        if breakout_distance <= 1:
+
+            score += 20
+
+        elif breakout_distance <= 3:
+
+            score += 15
+
+        elif breakout_distance <= 5:
+
+            score += 10
+
+        # ======================================================
+        # VOLUME SCORE
+        # ======================================================
+
+        if vol_ratio >= 10:
+
+            score += 25
+
+        elif vol_ratio >= 5:
+
+            score += 20
+
+        elif vol_ratio >= 3:
+
+            score += 15
+
+        elif vol_ratio >= 2:
+
+            score += 10
+
+        elif vol_ratio >= 1:
+
+            score += 5
+
+        # ======================================================
+        # MOMENTUM SCORE
+        # ======================================================
+
+        if return_pct >= 15:
+
+            score += 20
+
+        elif return_pct >= 10:
+
+            score += 15
+
+        elif return_pct >= 5:
+
+            score += 10
+
+        elif return_pct >= 2:
+
+            score += 5
+
+        # ======================================================
+        # BODY SCORE
+        # ======================================================
+
+        if body_pct >= 8:
+
+            score += 15
+
+        elif body_pct >= 5:
+
+            score += 10
+
+        elif body_pct >= 2:
+
+            score += 5
+
+        # ======================================================
+        # CLOSE NEAR HIGH
+        # ======================================================
+
+        if close_near_high <= 0.5:
+
+            score += 15
+
+        elif close_near_high <= 1:
+
+            score += 10
+
+        elif close_near_high <= 2:
+
+            score += 5
+
+        # ======================================================
+        # TREND BONUS
+        # ======================================================
+
+        if last_close > ma5_last:
+
+            score += 5
+
+        if last_close > ma20_last:
+
+            score += 5
+
+        if ma5_last > ma20_last:
+
+            score += 5
+
+        # ======================================================
+        # HEALTHY POSITION BONUS
+        # ======================================================
+
+        if distance_ma20 <= 5:
+
+            score += 10
+
+        elif distance_ma20 <= 10:
+
+            score += 5
+
+        # ======================================================
+        # EXTENDED PENALTY
+        # ======================================================
+
+        if distance_ma20 >= 30:
+
+            score -= 25
+
+        elif distance_ma20 >= 20:
+
+            score -= 15
+
+        elif distance_ma20 >= 15:
+
+            score -= 8
+
+        # ======================================================
+        # RED CANDLE PENALTY
+        # ======================================================
+
+        if last_close < last_open:
+
+            score -= 10
+
+        # ======================================================
+        # LOW VOLUME PENALTY
+        # ======================================================
+
+        if vol_last < 200_000:
+
+            score -= 10
+
+        # ======================================================
+        # NORMALIZE
+        # ======================================================
+
+        score = int(
+            max(
+                0,
+                min(score, 100)
+            )
+        )
+
+        return score
+
+    except Exception as e:
+
+        print(f"BSJP SCORE ERROR: {e}")
+
+        return 0

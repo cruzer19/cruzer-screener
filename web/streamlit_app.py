@@ -492,6 +492,7 @@ os.environ["YFINANCE_NO_SQLITE"] = "1"
 # ==========================================================
 # ===================== TELEGRAM ============================
 # ==========================================================
+
 def send_telegram(msg):
 
     bot_token = st.secrets.get("TELEGRAM_BOT_TOKEN")
@@ -516,6 +517,11 @@ def send_telegram(msg):
     except:
         pass
 
+
+# ==========================================================
+# ===================== HELPERS =============================
+# ==========================================================
+
 import pandas as pd
 
 def format_rsi_status(status):
@@ -536,12 +542,18 @@ def format_rsi_status(status):
 # ==========================================================
 # ===================== WEEK ================================
 # ==========================================================
+
 def scan_week(min_price=None, max_price=None):
 
     engine = ScreenerEngine()
-    results = engine.run(SAHAM_LIST[:810], "swing_trade_week")
 
-    rows = []
+    results = engine.run(
+        SAHAM_LIST[:810],
+        "swing_trade_week"
+    )
+
+    entry_rows = []
+    watchlist_rows = []
 
     for r in results:
 
@@ -549,241 +561,721 @@ def scan_week(min_price=None, max_price=None):
             continue
 
         try:
+
+            # ==================================================
+            # BASIC DATA
+            # ==================================================
+
             last_price = float(r.last_price)
+
             entry_low = float(r.entry_low)
+
             entry_high = float(r.entry_high)
 
-            distance = abs(last_price - entry_low) / entry_low
-
-            if last_price < 100:
-                continue
+            score = int(r.score)
 
             setup = str(r.setup)
 
-            # ================= ENTRY =================
-            in_entry = entry_low <= last_price <= entry_high
+            trend = str(r.trend)
 
-            near_entry = (
-                last_price < entry_low and
-                (entry_low - last_price) / entry_low <= 0.05
+            # ==================================================
+            # DISTANCE
+            # ==================================================
+
+            distance = abs(
+                last_price - entry_low
+            ) / max(entry_low, 1)
+
+            # ==================================================
+            # ENTRY CHECK
+            # ==================================================
+
+            distance_entry = (
+
+                abs(last_price - entry_low)
+
+                / max(entry_low, 1)
             )
 
-            entry_ready = in_entry or near_entry
+            # ==================================================
+            # TRUE ENTRY ZONE
+            # ==================================================
 
-            rows.append({
+            in_entry = (
+
+                entry_low <= last_price <= entry_high
+            )
+
+            # ==================================================
+            # NEAR ENTRY
+            # ==================================================
+
+            near_entry = (
+
+                distance_entry <= 0.08
+            )
+
+            # ==================================================
+            # EXTENDED FILTER
+            # ==================================================
+
+            too_extended = (
+
+                distance >= 0.10
+            )
+
+            # ==================================================
+            # READY ENTRY
+            # ==================================================
+
+            ready_entry = (
+
+                near_entry
+
+                and
+
+                not too_extended
+
+                and
+
+                trend != "Extended"
+
+                and
+
+                score >= 70
+            )
+
+            # ==================================================
+            # STATUS
+            # ==================================================
+
+            if score >= 90:
+
+                status = "🔥 Top Momentum"
+
+            elif score >= 80:
+
+                status = "🚀 Strong Momentum"
+
+            elif score >= 70:
+
+                status = "⚡ Pre-Breakout"
+
+            elif score >= 60:
+
+                status = "📈 Trend"
+
+            else:
+
+                status = "👀 Watchlist"
+
+            # ==================================================
+            # VOLUME
+            # ==================================================
+
+            volume_display = "-"
+
+            try:
+
+                volume_display = (
+                    r.score_breakdown.get(
+                        "Volume",
+                        "-"
+                    )
+                )
+
+            except:
+                pass
+
+            # ==================================================
+            # ROW
+            # ==================================================
+
+            row = {
+
                 "Kode": r.kode,
+
                 "Harga": int(last_price),
 
-                "Score": int(r.score),
+                "Score": score,
+
                 "Setup": setup,
 
-                "Trend": r.trend,  # 🔥 NEW
+                "Trend": trend,
 
-                "Near Entry": entry_ready,
+                "Near Entry": near_entry,
+
                 "Distance": round(distance, 3),
 
-                "Entry": f"{int(entry_low)} - {int(entry_high)}",
-                "TP": f"{int(r.tp[0])} / {int(r.tp[1])}",
+                "Volume": volume_display,
+
+                "Entry": (
+                    f"{int(entry_low)}"
+                    f" - "
+                    f"{int(entry_high)}"
+                ),
+
+                "TP": (
+                    f"{int(r.tp[0])}"
+                    f" / "
+                    f"{int(r.tp[1])}"
+                ),
+
                 "SL": int(r.sl),
-                "RR (%)": round(r.rr, 1),
-            })
+            }
+
+            # ==================================================
+            # SPLIT ENTRY & WATCHLIST
+            # ==================================================
+
+            if ready_entry:
+
+                entry_rows.append(row)
+
+            else:
+
+                watchlist_rows.append(row)
 
         except Exception as e:
-            print("ERROR PARSING:", r.kode, e)
+
+            print(
+                "[ERROR]",
+                getattr(r, "kode", "-"),
+                e
+            )
+
             continue
 
-    df = pd.DataFrame(rows)
+    # ======================================================
+    # DATAFRAME
+    # ======================================================
 
-    if df.empty:
-        return df, df
+    entry_df = pd.DataFrame(entry_rows)
 
-    # ================= FILTER HARGA =================
-    if min_price is not None and max_price is not None:
-        df = df[(df["Harga"] >= min_price) & (df["Harga"] <= max_price)]
+    watchlist_df = pd.DataFrame(watchlist_rows)
 
-    # ================= SPLIT (🔥 UPDATED) =================
-    df_best = df[
-        df["Setup"].str.contains("Accumulation", na=False) &
-        df["Setup"].str.contains("Uptrend", na=False)
-    ].copy()
+    # ======================================================
+    # FILTER PRICE
+    # ======================================================
 
-    df_acc = df[df["Setup"].str.contains("Smart Accumulation", na=False)].copy()
+    if (
+        min_price is not None
+        and
+        max_price is not None
+    ):
 
-    # ================= SORT =================
-    df_best = df_best.sort_values(by="Score", ascending=False).head(10)
-    df_acc = df_acc.sort_values(by="Score", ascending=False).head(10)
+        if not entry_df.empty:
 
-    # ================= RESET INDEX =================
-    for d in [df_best, df_acc]:
-        d.reset_index(drop=True, inplace=True)
-        d.index += 1
+            entry_df = entry_df[
 
-    return df_best, df_acc
+                (
+                    entry_df["Harga"]
+                    >=
+                    min_price
+                )
 
+                &
+
+                (
+                    entry_df["Harga"]
+                    <=
+                    max_price
+                )
+            ]
+
+        if not watchlist_df.empty:
+
+            watchlist_df = watchlist_df[
+
+                (
+                    watchlist_df["Harga"]
+                    >=
+                    min_price
+                )
+
+                &
+
+                (
+                    watchlist_df["Harga"]
+                    <=
+                    max_price
+                )
+            ]
+
+    # ======================================================
+    # SORT ENTRY
+    # ======================================================
+
+    if not entry_df.empty:
+
+        entry_df = entry_df.sort_values(
+
+            by=[
+                "Score",
+                "Distance"
+            ],
+
+            ascending=[
+                False,
+                True
+            ]
+        )
+
+        entry_df = entry_df.head(15)
+
+        entry_df.reset_index(
+            drop=True,
+            inplace=True
+        )
+
+        entry_df.index += 1
+
+    # ======================================================
+    # SORT WATCHLIST
+    # ======================================================
+
+    if not watchlist_df.empty:
+
+        watchlist_df = watchlist_df.sort_values(
+
+            by=[
+                "Score",
+                "Distance"
+            ],
+
+            ascending=[
+                False,
+                True
+            ]
+        )
+
+        watchlist_df = watchlist_df.head(15)
+
+        watchlist_df.reset_index(
+            drop=True,
+            inplace=True
+        )
+
+        watchlist_df.index += 1
+
+    # ======================================================
+    # TERMINAL DEBUG
+    # ======================================================
+
+    print("\n" + "=" * 80)
+    print("🚀 READY ENTRY")
+    print("=" * 80)
+
+    if not entry_df.empty:
+
+        for _, row in entry_df.iterrows():
+
+            print(
+                f"✅ {row['Kode']} | "
+                f"Score {row['Score']} | "
+                f"{row['Trend']} | "
+                f"Near {row['Near Entry']} | "
+                f"Dist {row['Distance']}"
+            )
+
+    else:
+
+        print("Tidak ada ready entry")
+
+    print("\n" + "=" * 80)
+    print("👀 WATCHLIST")
+    print("=" * 80)
+
+    if not watchlist_df.empty:
+
+        for _, row in watchlist_df.iterrows():
+
+            print(
+                f"👀 {row['Kode']} | "
+                f"Score {row['Score']} | "
+                f"{row['Trend']} | "
+                f"Near {row['Near Entry']} | "
+                f"Dist {row['Distance']}"
+            )
+
+    else:
+
+        print("Tidak ada watchlist")
+
+    return entry_df, watchlist_df
 
 # ==========================================================
 # ===================== MAIN UI =============================
 # ==========================================================
+
 def render_screener():
 
     st.header("📊 CRUZER AI - SCREENER")
 
-    # ================= RESET =================
+    # ======================================================
+    # RESET
+    # ======================================================
+
     if st.button("Reset Scanner"):
+
         st.session_state["scanner_state"] = {
+
             "alerted": {},
+
             "last_status": {}
         }
-        st.success("Scanner berhasil di-reset")
 
-    # ================= SELECT TYPE =================
+        st.success(
+            "Scanner berhasil di-reset"
+        )
+
+    # ======================================================
+    # SELECT TYPE
+    # ======================================================
+
     screener_type = st.selectbox(
+
         "Pilih Tipe",
+
         [
-            "Swing Trade (Day)",
-            "Swing Trade (Week)",
+            "Fast Trade (ARA Hunter)",
+            "Swing Trade (Day-Week)",
             "Beli Sore Jual Pagi (BSJP)"
         ]
     )
 
-    # ================= INIT STATE =================
+    # ======================================================
+    # INIT STATE
+    # ======================================================
+
     if "scanner_state" not in st.session_state:
+
         st.session_state["scanner_state"] = {
+
             "alerted": {},
+
             "last_status": {}
         }
 
-    # ================= SCAN BUTTON =================
-    if st.button("🚀 Scan Market", use_container_width=True):
+    # ======================================================
+    # SCAN BUTTON
+    # ======================================================
 
-        with st.spinner("Scanning market..."):
+    if st.button(
+        "🚀 Scan Market",
+        use_container_width=True
+    ):
 
-            if screener_type == "Swing Trade (Day)":
+        with st.spinner(
+            "Scanning market..."
+        ):
 
-                df, alerts, state = scan_day(st.session_state["scanner_state"])
+            # ==================================================
+            # ARA HUNTER
+            # ==================================================
 
-                st.session_state["scanner_state"] = state
+            if "ARA Hunter" in screener_type:
+
+                df, alerts, state = scan_day(
+                    st.session_state["scanner_state"]
+                )
+
+                if not df.empty:
+
+                    sort_cols = []
+
+                    if "Score" in df.columns:
+                        sort_cols.append("Score")
+
+                    if "Volume" in df.columns:
+                        sort_cols.append("Volume")
+
+                    if sort_cols:
+
+                        df = df.sort_values(
+
+                            by=sort_cols,
+
+                            ascending=False
+                        )
+
+                    df = df.head(20)
+
+                st.session_state[
+                    "scanner_state"
+                ] = state
+
                 st.session_state["mode"] = "day"
+
                 st.session_state["data"] = df
 
+            # ==================================================
+            # BSJP
+            # ==================================================
 
-            elif screener_type == "Beli Sore Jual Pagi (BSJP)":
+            elif (
+                screener_type
+                ==
+                "Beli Sore Jual Pagi (BSJP)"
+            ):
 
-                df, alerts, state = scan_bsjp(st.session_state["scanner_state"])
+                df, alerts, state = scan_bsjp(
+                    st.session_state["scanner_state"]
+                )
 
-                st.session_state["scanner_state"] = state
+                st.session_state[
+                    "scanner_state"
+                ] = state
+
                 st.session_state["mode"] = "bsjp"
+
                 st.session_state["data"] = df
 
+            # ==================================================
+            # WEEK
+            # ==================================================
 
             else:
-                df_best = pd.DataFrame()
-                df_acc = pd.DataFrame()
+
+                entry_df = pd.DataFrame()
+
+                watchlist_df = pd.DataFrame()
 
                 try:
-                    df_best, df_acc = scan_week()
+
+                    entry_df, watchlist_df = scan_week()
+
                 except Exception as e:
-                    st.error(f"Scan error: {e}")
+
+                    st.error(
+                        f"Scan error: {e}"
+                    )
 
                 st.session_state["mode"] = "week"
-                st.session_state["best"] = df_best
-                st.session_state["accumulation"] = df_acc
 
-            st.session_state["time"] = datetime.now(tz).strftime("%d %b %H:%M:%S")
+                st.session_state["entry_data"] = entry_df
 
-    # ================= DISPLAY =================
+                st.session_state["watchlist_data"] = watchlist_df
+
+            st.session_state["time"] = (
+                datetime.now(tz)
+                .strftime("%d %b %H:%M:%S")
+            )
+
+    # ======================================================
+    # DISPLAY
+    # ======================================================
+
     if "mode" not in st.session_state:
         return
 
-    st.caption(f"⏱ Last Scan: {st.session_state.get('time','-')}")
+    st.caption(
+        f"⏱ Last Scan: "
+        f"{st.session_state.get('time','-')}"
+    )
+
+    # ======================================================
+    # DAY
+    # ======================================================
 
     if st.session_state["mode"] == "day":
 
-        df = st.session_state.get("data", pd.DataFrame())
+        st.subheader(
+            "⚡ ARA HUNTER"
+        )
+
+        df = st.session_state.get(
+            "data",
+            pd.DataFrame()
+        )
 
         if df.empty:
-            st.warning("📭 Tidak ada data")
-        else:
-            st.dataframe(df, use_container_width=True)
 
+            st.warning(
+                "📭 Tidak ada data"
+            )
+
+        else:
+
+            st.dataframe(
+                df,
+                use_container_width=True
+            )
+
+    # ======================================================
+    # BSJP
+    # ======================================================
 
     elif st.session_state["mode"] == "bsjp":
 
-        st.subheader("🎯 BSJP SETUP (BUY SORE JUAL PAGI)")
+        st.subheader(
+            "🎯 BSJP SETUP"
+        )
 
-        df = st.session_state.get("data", pd.DataFrame())
+        df = st.session_state.get(
+            "data",
+            pd.DataFrame()
+        )
 
         if df.empty:
-            st.warning("📭 Tidak ada kandidat BSJP")
-        else:
-            st.dataframe(df, use_container_width=True)
 
+            st.warning(
+                "📭 Tidak ada kandidat BSJP"
+            )
+
+        else:
+
+            st.dataframe(
+                df,
+                use_container_width=True
+            )
+
+    # ======================================================
+    # WEEK
+    # ======================================================
 
     else:
 
-        # 🔥 BEST SETUP
-        st.subheader("🔥 ACCUMULATION + UPTREND (BEST)")
+        # ==================================================
+        # ENTRY READY
+        # ==================================================
 
-        df_best = st.session_state.get("best", pd.DataFrame())
+        st.subheader(
+            "🚀 READY ENTRY"
+        )
 
-        if df_best.empty:
-            st.warning("📭 Tidak ada setup terbaik")
+        entry_df = st.session_state.get(
+            "entry_data",
+            pd.DataFrame()
+        )
+
+        if entry_df.empty:
+
+            st.warning(
+                "📭 Tidak ada setup entry"
+            )
+
         else:
-            st.dataframe(df_best, use_container_width=True)
+
+            st.dataframe(
+                entry_df,
+                use_container_width=True
+            )
+
+        # ==================================================
+        # WATCHLIST
+        # ==================================================
 
         st.divider()
 
-        # 🟢 SMART ACCUMULATION
-        st.subheader("🟢 SMART ACCUMULATION")
+        st.subheader(
+            "👀 WATCHLIST"
+        )
 
-        df_acc = st.session_state.get("accumulation", pd.DataFrame())
+        watchlist_df = st.session_state.get(
+            "watchlist_data",
+            pd.DataFrame()
+        )
 
-        if df_acc.empty:
-            st.info("Tidak ada accumulation")
+        if watchlist_df.empty:
+
+            st.warning(
+                "📭 Tidak ada watchlist"
+            )
+
         else:
-            st.dataframe(df_acc, use_container_width=True)
 
-        # ===================== TELEGRAM =====================
+            st.dataframe(
+                watchlist_df,
+                use_container_width=True
+            )
+
+        # ==================================================
+        # TELEGRAM
+        # ==================================================
+
         st.divider()
-        st.subheader("📤 Share Screener Result")
 
-        SHARE_PASSWORD = st.secrets.get("SHARE_PASSWORD")
+        st.subheader(
+            "📤 Share Screener Result"
+        )
+
+        SHARE_PASSWORD = st.secrets.get(
+            "SHARE_PASSWORD"
+        )
+
         df_ihsg = get_price_data("^JKSE")
 
         input_pwd = st.text_input(
+
             "🔐 Password untuk kirim Telegram",
+
             type="password",
+
             key="share_pwd_screener",
         )
 
-        is_authorized = input_pwd == SHARE_PASSWORD
+        is_authorized = (
+            input_pwd == SHARE_PASSWORD
+        )
 
         if st.button(
+
             "📨 Send Screener to Telegram",
+
             type="primary",
+
             use_container_width=True,
+
             disabled=not is_authorized,
         ):
+
             try:
+
                 results = []
 
-                for df in [df_best, df_acc]:
-                    if not df.empty:
-                        results.extend(df.to_dict(orient="records"))
+                if not entry_df.empty:
+
+                    results.extend(
+                        entry_df.to_dict(
+                            orient="records"
+                        )
+                    )
+
+                if not watchlist_df.empty:
+
+                    results.extend(
+                        watchlist_df.to_dict(
+                            orient="records"
+                        )
+                    )
 
                 if not results:
-                    st.warning("Tidak ada data untuk dikirim")
+
+                    st.warning(
+                        "Tidak ada data untuk dikirim"
+                    )
+
                 else:
-                    msg = render_telegram(results, df_ihsg=df_ihsg)
+
+                    msg = render_telegram(
+                        results,
+                        df_ihsg=df_ihsg
+                    )
+
                     send_message(msg)
-                    st.success("Terkirim ke Telegram ✅")
+
+                    st.success(
+                        "Terkirim ke Telegram ✅"
+                    )
 
             except Exception as e:
-                st.error("❌ Gagal kirim ke Telegram")
-                st.code(str(e))
 
-        if input_pwd and not is_authorized:
-            st.error("❌ Password salah")
+                st.error(
+                    "❌ Gagal kirim ke Telegram"
+                )
+
+                st.code(str(e))
 
 # ==========================================================
 # =================== TRADING TRACKER ======================

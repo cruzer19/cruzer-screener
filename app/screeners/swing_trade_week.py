@@ -2,297 +2,982 @@ import pandas as pd
 
 from app.screeners.base import BaseScreener
 from app.models.stock_result import StockResult
+
 from app.core.data_loader import load_daily_data
 from app.utils.helpers import round_down, round_up
 
 
-# ==========================================================
-# 🟢 ACCUMULATION SCORE
-# ==========================================================
-def get_accumulation_score(df):
-
-    volume = df["Volume"]
-    high = df["High"]
-    low = df["Low"]
-    close = df["Close"]
-
-    vol_ma5 = volume.rolling(5).mean()
-    vol_ma10 = volume.rolling(10).mean()
-    vol_ma20 = volume.rolling(20).mean()
-
-    spread = (high - low).replace(0, 1)
-    avg_range = spread.rolling(10).mean()
-
-    score = 0
-
-    # Volume acceleration (lebih smooth)
-    if vol_ma5.iloc[-1] > vol_ma20.iloc[-1] * 1.3:
-        score += 20
-
-    if vol_ma10.iloc[-1] > vol_ma20.iloc[-1] * 1.2:
-        score += 15
-
-    # Close position (buyer dominance)
-    close_pos = (close.iloc[-1] - low.iloc[-1]) / spread.iloc[-1]
-    if close_pos > 0.7:
-        score += 20
-
-    # Volatility contraction
-    if spread.iloc[-1] < avg_range.iloc[-1] * 0.8:
-        score += 20
-
-    # Volume consistency (bukan spike doang)
-    if volume.tail(5).mean() > vol_ma20.iloc[-1] * 1.2:
-        score += 15
-
-    # Higher low (structure)
-    if low.iloc[-1] > low.iloc[-3]:
-        score += 10
-
-    # 🔥 slow accumulation (big cap friendly)
-    if vol_ma5.iloc[-1] > vol_ma20.iloc[-1] * 1.05:
-        score += 10
-
-    if close.iloc[-1] > close.iloc[-5]:
-        score += 10
-
-    return score
-
-
-# ==========================================================
-# 📈 UPTREND SCORE (REPLACEMENT MOMENTUM 🔥)
-# ==========================================================
-def get_uptrend_score(df):
-
-    close = df["Close"]
-
-    ma5 = close.rolling(5).mean()
-    ma20 = close.rolling(20).mean()
-
-    # 🔥 slope (WAJIB ADA SEBELUM DIPAKAI)
-    if len(ma20) < 6:
-        return 0
-
-    ma20_slope = ma20.iloc[-1] - ma20.iloc[-5]
-
-    score = 0
-
-    # MA alignment
-    if ma5.iloc[-1] > ma20.iloc[-1]:
-        score += 30
-
-    # price above MA20
-    if close.iloc[-1] > ma20.iloc[-1]:
-        score += 25
-
-    # higher close
-    if close.iloc[-1] > close.iloc[-3]:
-        score += 25
-
-    # 🔥 slope trend (INI YANG TADI ERROR)
-    if ma20_slope > 0:
-        score += 20
-
-    return score
-
-# ==========================================================
-# 📍 TREND POSITION (EARLY / MID / LATE)
-# ==========================================================
-def get_trend_position(df):
-
-    close = df["Close"]
-    ma20 = close.rolling(20).mean()
-
-    distance = (close.iloc[-1] - ma20.iloc[-1]) / ma20.iloc[-1]
-
-    if distance < 0.08:
-        return "🟢 Early"
-    elif distance < 0.15:
-        return "🟡 Mid"
-    else:
-        return "🔴 Late"
-
-
-# ==========================================================
-# 📉 STRUCTURE
-# ==========================================================
-def get_structure(df):
-
-    close = df["Close"]
-    low = df["Low"]
-
-    support = low.tail(30).min()
-    last_close = close.iloc[-1]
-
-    distance = abs(last_close - support) / support
-
-    return distance, support
-
-# ==========================================================
-# ⚡ PRICE MOVEMENT FILTER (ANTI SAHAM LEMOT)
-# ==========================================================
-def is_active_stock(df):
-
-    high = df["High"]
-    low = df["Low"]
-    close = df["Close"]
-
-    # 🔥 range harian
-    spread = (high - low).replace(0, 1)
-
-    # 🔥 ATR sederhana
-    avg_range = spread.rolling(10).mean()
-
-    last_range = spread.iloc[-1]
-    last_price = close.iloc[-1]
-
-    # 🔥 persentase gerakan
-    move_pct = last_range / last_price
-
-    # ================= RULE =================
-    # minimal gerakan 1.5% - 2%
-    return move_pct >= 0.007
-
-
-# ==========================================================
-# 🔥 MAIN SCREENER (UPTREND VERSION)
-# ==========================================================
 class SwingTradeWeekScreener(BaseScreener):
 
-    screener_type = "Swing Trade (Week) v8 - Acc + Trend"
+    """
+    Swing Trade Week
+    Healthy Pullback + Rebound Strategy
+
+    Fokus:
+    - Uptrend sehat
+    - Koreksi sehat
+    - Near support
+    - Liquid
+    - Rebound potential
+    """
+
+    screener_type = "swing_trade_week"
 
     def analyze(self, kode: str):
 
+        # ======================================================
+        # LOAD DATA
+        # ======================================================
+
         df = load_daily_data(kode)
 
-        if df is None or df.empty or len(df) < 50:
+        if df is None or len(df) < 100:
             return None
 
-        df = df.copy()
-        df.columns = [c.capitalize() for c in df.columns]
+        # ======================================================
+        # DATA
+        # ======================================================
 
-        if "Close" not in df.columns:
-            return None
-
-        df = df.sort_index().dropna()
-        df = df[df["Close"] > 0]
-
-        if not is_active_stock(df):
-            return None
-
-        # ================= LIQUIDITY =================
-        avg_vol = df["Volume"].tail(20).mean()
-        if avg_vol < 500_000:
-            return None
-
-        last_close = float(df["Close"].iloc[-1])
-
-        # ================= SCORES =================
-        acc_score = get_accumulation_score(df)
-        trend_score = get_uptrend_score(df)
-        distance, support = get_structure(df)
-        trend_position = get_trend_position(df)
-
-        # ================= TREND STRENGTH FILTER =================
         close = df["Close"]
 
-        if close.iloc[-1] < close.iloc[-3] * 0.995:
-            return None
+        open_price = df["Open"]
 
-        # ================= DISTANCE FILTER =================
-        if distance > 0.16:
-            return None
+        high = df["High"]
 
-        # ================= LEADER FILTER =================
-        price_change_5d = (close.iloc[-1] - close.iloc[-5]) / close.iloc[-5]
+        low = df["Low"]
 
-        if price_change_5d < 0.01:
-            return None
+        volume = df["Volume"]
 
-        # ================= CLASSIFICATION =================
+        # ======================================================
+        # LAST VALUE
+        # ======================================================
 
-        # 🔥 ACC + UPTREND (BEST)
-        if acc_score >= 75 and trend_score >= 60:
+        last_close = float(close.iloc[-1])
 
-            setup = "🔥 Accumulation + Uptrend"
+        prev_close = float(close.iloc[-2])
 
-            pullback_zone = df["Close"].tail(5).min()
+        last_open = float(open_price.iloc[-1])
 
-            entry_low = round_down(pullback_zone)
-            entry_high = round_up(last_close * 1.02)
+        last_high = float(high.iloc[-1])
 
-            sl = round_down(support * 0.97)
+        last_low = float(low.iloc[-1])
 
-            tp1 = round_up(last_close * 1.08)
-            tp2 = round_up(last_close * 1.15)
+        vol_last = float(volume.iloc[-1])
 
-            main_score = acc_score * 0.6 + trend_score * 0.4
+        # ======================================================
+        # MOVING AVERAGE
+        # ======================================================
 
-        # 🟢 SMART ACCUMULATION
-        elif acc_score >= 60 and trend_score < 70 and distance <= 0.10:
+        ma5 = close.rolling(5).mean()
 
-            setup = "🟢 Smart Accumulation"
+        ma20 = close.rolling(20).mean()
 
-            entry_low = round_down(support * 0.98)
-            entry_high = round_up(support * 1.04)
+        ma50 = close.rolling(50).mean()
 
-            sl = round_down(support * 0.95)
+        ma100 = close.rolling(100).mean()
 
-            tp1 = round_up(last_close * 1.05)
-            tp2 = round_up(last_close * 1.10)
+        ma5_last = float(ma5.iloc[-1])
 
-            main_score = acc_score * 0.8 + trend_score * 0.2
+        ma20_last = float(ma20.iloc[-1])
 
-        else:
-            return None
+        ma50_last = float(ma50.iloc[-1])
 
-        # ================= RR =================
-        risk = last_close - sl
-        reward = tp2 - last_close
-        rr = (reward / risk) * 100 if risk > 0 else 0
+        ma100_last = float(ma100.iloc[-1])
 
-        # ================= DEBUG =================
-        print(
-            kode,
-            "| setup:", setup,
-            "| acc:", acc_score,
-            "| trend:", trend_score
+        # ======================================================
+        # VOLUME
+        # ======================================================
+
+        vol_ma20 = volume.rolling(20).mean()
+
+        vol_ma20_last = float(vol_ma20.iloc[-1])
+
+        vol_ratio = (
+            vol_last / max(vol_ma20_last, 1)
         )
 
-        # ================= NORMALIZE SCORE =================
-        MAX_SCORE = 120  # asumsi max internal
+        # ======================================================
+        # LIQUIDITY
+        # ======================================================
 
-        normalized_score = (main_score / MAX_SCORE) * 100
+        traded_value = (
+            last_close * vol_last
+        )
 
-        # clamp biar gak lewat 100
-        normalized_score = max(0, min(100, normalized_score))
+        # ======================================================
+        # PRICE ACTION
+        # ======================================================
 
-        score = int(round(normalized_score / 5) * 5)
+        return_pct = (
+            (last_close - prev_close)
+            / max(prev_close, 1)
+        ) * 100
 
-        # ================= RETURN =================
+        distance_ma20 = (
+            (last_close - ma20_last)
+            / max(ma20_last, 1)
+        ) * 100
+
+        distance_ma50 = (
+            (last_close - ma50_last)
+            / max(ma50_last, 1)
+        ) * 100
+
+        distance_ma100 = (
+            (last_close - ma100_last)
+            / max(ma100_last, 1)
+        ) * 100
+
+        # ======================================================
+        # PULLBACK ANALYSIS
+        # ======================================================
+
+        recent_high_5 = float(
+            high.tail(5).max()
+        )
+
+        recent_high_10 = float(
+            high.tail(10).max()
+        )
+
+        pullback_pct = (
+            (last_close - recent_high_5)
+            / max(recent_high_5, 1)
+        ) * 100
+
+        recent_low_10 = float(
+            low.tail(10).min()
+        )
+
+        rebound_zone = (
+            (last_close - recent_low_10)
+            / max(recent_low_10, 1)
+        ) * 100
+
+        near_ma20 = (
+            abs(distance_ma20) <= 3
+        )
+
+        # ======================================================
+        # CANDLE ANALYSIS
+        # ======================================================
+
+        body_pct = (
+            abs(last_close - last_open)
+            / max(last_open, 1)
+        ) * 100
+
+        upper_wick = (
+            (last_high - max(last_open, last_close))
+            / max(last_close, 1)
+        ) * 100
+
+        lower_wick = (
+            (min(last_open, last_close) - last_low)
+            / max(last_low, 1)
+        ) * 100
+
+        close_near_high = (
+            (last_high - last_close)
+            / max(last_close, 1)
+        ) * 100
+
+        # ======================================================
+        # VOLATILITY
+        # ======================================================
+
+        atr_pct = (
+            (high.tail(14).max() - low.tail(14).min())
+            / max(last_close, 1)
+        ) * 100
+
+        # ======================================================
+        # TREND STABILITY
+        # ======================================================
+
+        trend_stability = (
+            close.tail(20).std()
+            / max(close.tail(20).mean(), 1)
+        ) * 100
+
+        # ======================================================
+        # TREND ANALYSIS
+        # ======================================================
+
+        bullish_alignment = (
+
+            ma20_last > ma50_last and
+            ma50_last > ma100_last
+
+        )
+
+        ma20_uptrend = (
+            ma20.iloc[-1] > ma20.iloc[-5]
+        )
+
+        ma50_uptrend = (
+            ma50.iloc[-1] > ma50.iloc[-5]
+        )
+
+        # ======================================================
+        # FILTER
+        # ======================================================
+
+        failed = []
+
+        # ======================================================
+        # BASIC FILTER
+        # ======================================================
+
+        # minimum volume
+        if vol_last < 500_000:
+            failed.append("Low Volume")
+
+        # minimum liquidity
+        if traded_value < 3_000_000_000:
+            failed.append("Low Liquidity")
+
+        # trend besar bullish
+        if not bullish_alignment:
+            failed.append("Weak Alignment")
+
+        # MA50 wajib naik
+        if not ma50_uptrend:
+            failed.append("MA50 Downtrend")
+
+        # boleh sedikit di bawah MA20
+        if distance_ma20 < -4:
+            failed.append("Too Weak Below MA20")
+
+        # ======================================================
+        # HEALTHY PULLBACK FILTER
+        # ======================================================
+
+        if distance_ma20 >= 12:
+            failed.append("Too Extended")
+
+        if pullback_pct <= -18:
+            failed.append("Too Deep Pullback")
+
+        # ======================================================
+        # REBOUND FILTER
+        # ======================================================
+
+        if rebound_zone >= 35:
+            failed.append("Too Far From Support")
+
+        # ======================================================
+        # REJECT
+        # ======================================================
+
+        if failed:
+
+            print(
+                f"❌ {kode} -> {', '.join(failed)}"
+            )
+
+            return None
+
+        # ======================================================
+        # SCORE
+        # ======================================================
+
+        score = 40
+
+        # ======================================================
+        # TREND SCORE
+        # ======================================================
+
+        if bullish_alignment:
+            score += 10
+
+        if ma20_uptrend:
+            score += 6
+        else:
+            score -= 4
+
+        if ma50_uptrend:
+            score += 6
+
+        if last_close > ma20_last:
+            score += 4
+
+        # ======================================================
+        # PULLBACK SCORE
+        # ======================================================
+
+        if near_ma20:
+            score += 8
+
+        if -12 <= pullback_pct <= -2:
+            score += 10
+
+        elif -18 <= pullback_pct <= -12:
+            score += 4
+
+        # ======================================================
+        # REBOUND SCORE
+        # ======================================================
+
+        if lower_wick >= 4:
+            score += 8
+
+        elif lower_wick >= 2:
+            score += 4
+
+        # ======================================================
+        # VOLUME SCORE
+        # ======================================================
+
+        if vol_ratio >= 5:
+            score += 10
+
+        elif vol_ratio >= 3:
+            score += 7
+
+        elif vol_ratio >= 2:
+            score += 5
+
+        elif vol_ratio >= 1.2:
+            score += 2
+
+        # ======================================================
+        # LIQUIDITY SCORE
+        # ======================================================
+
+        if traded_value >= 100_000_000_000:
+            score += 6
+
+        elif traded_value >= 50_000_000_000:
+            score += 4
+
+        elif traded_value >= 20_000_000_000:
+            score += 2
+
+        # ======================================================
+        # VOLATILITY SCORE
+        # ======================================================
+
+        # volatility sehat
+        if 10 <= atr_pct <= 20:
+            score += 5
+
+        elif 8 <= atr_pct < 10:
+            score += 3
+
+        # terlalu liar jangan terlalu dibonusin
+        elif atr_pct > 20:
+            score += 2
+
+        # ======================================================
+        # MOMENTUM BONUS
+        # ======================================================
+
+        if 1 <= return_pct <= 5:
+            score += 5
+
+        elif 0 <= return_pct < 1:
+            score += 2
+
+        # ======================================================
+        # HEALTHY CANDLE BONUS
+        # ======================================================
+
+        if body_pct >= 2:
+            score += 3
+
+        if close_near_high <= 1:
+            score += 3
+
+        # ======================================================
+        # PENALTY
+        # ======================================================
+
+        # ======================================================
+        # TOO EXTENDED
+        # ======================================================
+
+        if distance_ma20 >= 12:
+            score -= 15
+
+        elif distance_ma20 >= 10:
+            score -= 10
+
+        elif distance_ma20 >= 8:
+            score -= 5
+
+        # ======================================================
+        # WEAK VOLUME
+        # ======================================================
+
+        if vol_ratio < 0.8:
+            score -= 8
+
+        elif vol_ratio < 1:
+            score -= 5
+
+        # ======================================================
+        # UPPER WICK
+        # ======================================================
+
+        if upper_wick >= 7:
+            score -= 12
+
+        elif upper_wick >= 5:
+            score -= 8
+
+        elif upper_wick >= 3:
+            score -= 4
+
+        # ======================================================
+        # SMALL BODY
+        # ======================================================
+
+        if body_pct < 0.3:
+            score -= 8
+
+        elif body_pct < 0.5:
+            score -= 5
+
+        # ======================================================
+        # LOW LIQUIDITY
+        # ======================================================
+
+        if traded_value < 3_000_000_000:
+            score -= 15
+
+        elif traded_value < 5_000_000_000:
+            score -= 10
+
+        elif traded_value < 10_000_000_000:
+            score -= 5
+
+        # ======================================================
+        # LOW VOLATILITY
+        # ======================================================
+
+        if atr_pct < 4:
+            score -= 18
+
+        elif atr_pct < 5:
+            score -= 15
+
+        elif atr_pct < 8:
+            score -= 8
+
+        # ======================================================
+        # TREND STABILITY
+        # ======================================================
+
+        if trend_stability >= 25:
+            score -= 20
+
+        elif trend_stability >= 20:
+            score -= 12
+
+        elif trend_stability >= 15:
+            score -= 6
+
+        # ======================================================
+        # TOO CLOSE TO RESISTANCE
+        # ======================================================
+
+        distance_high_10 = (
+            (recent_high_10 - last_close)
+            / max(last_close, 1)
+        ) * 100
+
+        if distance_high_10 <= 1:
+            score -= 10
+
+        elif distance_high_10 <= 2:
+            score -= 5
+
+        # ======================================================
+        # WEAK REBOUND STRUCTURE
+        # ======================================================
+
+        if lower_wick < 1 and return_pct <= 0:
+            score -= 5
+
+        # ======================================================
+        # SIDEWAYS / DEAD STOCK
+        # ======================================================
+
+        if abs(return_pct) < 0.3 and atr_pct < 6:
+            score -= 8
+
+        # ======================================================
+        # NORMALIZE
+        # ======================================================
+
+        score = int(
+            max(
+                0,
+                min(score, 99)
+            )
+        )
+
+        # ======================================================
+        # STATUS
+        # ======================================================
+
+        if score >= 88:
+
+            status = "🔥 Elite Rebound"
+
+        elif score >= 80:
+
+            status = "🚀 Strong Pullback"
+
+        elif score >= 72:
+
+            status = "⚡ Healthy Setup"
+
+        elif score >= 64:
+
+            status = "👀 Watchlist"
+
+        else:
+
+            status = "❌ Weak Setup"
+
+        # ======================================================
+        # TREND TYPE
+        # ======================================================
+
+        if distance_ma20 <= 3:
+
+            trend = "Support"
+
+        elif distance_ma20 <= 7:
+
+            trend = "Healthy"
+
+        else:
+
+            trend = "Extended"
+
+        # ======================================================
+        # ENTRY
+        # ======================================================
+
+        entry_low = round_down(
+            min(last_close, ma5_last)
+        )
+
+        entry_high = round_up(
+            ma20_last * 1.03
+        )
+
+        # ======================================================
+        # TAKE PROFIT
+        # ======================================================
+
+        tp1 = round_up(
+            last_close * 1.05
+        )
+
+        tp2 = round_up(
+            last_close * 1.10
+        )
+
+        tp3 = round_up(
+            recent_high_10
+        )
+
+        # ======================================================
+        # STOP LOSS
+        # ======================================================
+
+        sl = round_down(
+            recent_low_10 * 0.97
+        )
+
+        # ======================================================
+        # RISK REWARD
+        # ======================================================
+
+        risk = max(last_close - sl, 1)
+
+        reward = max(tp2 - last_close, 1)
+
+        rr = round(
+            reward / risk,
+            2
+        )
+
+        # ======================================================
+        # DISPLAY
+        # ======================================================
+
+        if vol_last >= 1_000_000_000:
+
+            volume_display = (
+                f"{round(vol_last / 1_000_000_000, 2)}B"
+            )
+
+        elif vol_last >= 1_000_000:
+
+            volume_display = (
+                f"{round(vol_last / 1_000_000, 2)}M"
+            )
+
+        else:
+
+            volume_display = (
+                f"{round(vol_last / 1000, 0)}K"
+            )
+
+        traded_value_display = (
+            f"{round(traded_value / 1_000_000_000, 2)}B"
+        )
+
+        # ======================================================
+        # DEBUG
+        # ======================================================
+
+        print("\n" + "=" * 80)
+
+        print(f"📈 {kode}")
+
+        print("-" * 80)
+
+        print(
+            f"Harga         : {round_down(last_close)} "
+            f"({round(return_pct,2)}%)"
+        )
+
+        print(
+            f"Volume        : {volume_display} "
+            f"(x{round(vol_ratio,2)})"
+        )
+
+        print(
+            f"Liquidity     : {traded_value_display}"
+        )
+
+        print(
+            f"ATR           : {round(atr_pct,2)}%"
+        )
+
+        print(
+            f"Status        : {status}"
+        )
+
+        print(
+            f"Trend         : {trend}"
+        )
+
+        print(
+            f"Pullback      : {round(pullback_pct,2)}%"
+        )
+
+        print(
+            f"Distance MA20 : {round(distance_ma20,2)}%"
+        )
+
+        print(
+            f"Distance MA50 : {round(distance_ma50,2)}%"
+        )
+
+        print(
+            f"Lower Wick    : {round(lower_wick,2)}%"
+        )
+
+        print(
+            f"Upper Wick    : {round(upper_wick,2)}%"
+        )
+
+        print("-" * 80)
+
+        print(
+            f"Entry         : {entry_low} - {entry_high}"
+        )
+
+        print(
+            f"TP            : {tp1} / {tp2} / {tp3}"
+        )
+
+        print(
+            f"SL            : {sl}"
+        )
+
+        print(
+            f"RR            : {rr}"
+        )
+
+        print("-" * 80)
+
+        print(
+            f"🔥 FINAL SCORE : {score}/100"
+        )
+
+        print("=" * 80)
+
+        # ======================================================
+        # RESULT
+        # ======================================================
+
         return StockResult(
+
             kode=kode,
-            last_price=int(last_close),
 
-            score = score,
-            rank=float(main_score),
+            last_price=round_down(last_close),
 
-            setup=setup,
-            trend=trend_position,  # 🔥 INI BARU
+            score=score,
 
-            entry_low=int(entry_low),
-            entry_high=int(entry_high),
+            setup=status,
 
-            tp=[int(tp1), int(tp2)],
-            sl=int(sl),
+            trend=trend,
 
-            rr=round(rr, 1),
+            entry_low=entry_low,
 
-            recommendation="Swing v8",
+            entry_high=entry_high,
+
+            tp=[tp1, tp2, tp3],
+
+            sl=sl,
+
+            rr=rr,
+
+            recommendation=status,
+
             screener_type=self.screener_type,
 
             score_breakdown={
-                "Accumulation": acc_score,
-                "Trend": trend_score
+
+                "Volume": volume_display,
+
+                "Volume Ratio": round(vol_ratio, 2),
+
+                "Liquidity": traded_value_display,
+
+                "ATR %": round(atr_pct, 2),
+
+                "Return %": round(return_pct, 2),
+
+                "Pullback %": round(pullback_pct, 2),
+
+                "Distance MA20": round(distance_ma20, 2),
+
+                "Distance MA50": round(distance_ma50, 2),
+
+                "Distance MA100": round(distance_ma100, 2),
+
+                "Lower Wick": round(lower_wick, 2),
+
+                "Upper Wick": round(upper_wick, 2),
+
+                "Close Near High": round(close_near_high, 2),
+
+                "Body %": round(body_pct, 2),
+
+                "RR": rr
             }
         )
+
+# ======================================================
+# 📊 SWING TRADE SCORE ONLY
+# ======================================================
+
+def calculate_swing_trade_score(df):
+
+    try:
+
+        if df is None or len(df) < 100:
+            return 0
+
+        df = df.copy()
+
+        df.columns = [
+            str(c).strip().lower()
+            for c in df.columns
+        ]
+
+        close = df["close"]
+
+        high = df["high"]
+
+        low = df["low"]
+
+        volume = df["volume"]
+
+        last_close = float(close.iloc[-1])
+
+        # ======================================================
+        # MOVING AVERAGE
+        # ======================================================
+
+        ma20 = close.rolling(20).mean()
+
+        ma50 = close.rolling(50).mean()
+
+        ma100 = close.rolling(100).mean()
+
+        ma20_last = float(ma20.iloc[-1])
+
+        ma50_last = float(ma50.iloc[-1])
+
+        ma100_last = float(ma100.iloc[-1])
+
+        # ======================================================
+        # VOLUME
+        # ======================================================
+
+        vol_ma20 = volume.rolling(20).mean()
+
+        vol_ratio = (
+            volume.iloc[-1]
+            / max(vol_ma20.iloc[-1], 1)
+        )
+
+        traded_value = (
+            last_close * volume.iloc[-1]
+        )
+
+        # ======================================================
+        # PRICE ACTION
+        # ======================================================
+
+        distance_ma20 = (
+            (last_close - ma20_last)
+            / max(ma20_last, 1)
+        ) * 100
+
+        recent_high_5 = float(
+            high.tail(5).max()
+        )
+
+        pullback_pct = (
+            (last_close - recent_high_5)
+            / max(recent_high_5, 1)
+        ) * 100
+
+        # ======================================================
+        # VOLATILITY
+        # ======================================================
+
+        atr_pct = (
+            (high.tail(14).max() - low.tail(14).min())
+            / max(last_close, 1)
+        ) * 100
+
+        # ======================================================
+        # TREND
+        # ======================================================
+
+        bullish_alignment = (
+
+            ma20_last > ma50_last and
+            ma50_last > ma100_last
+
+        )
+
+        # ======================================================
+        # SCORE
+        # ======================================================
+
+        score = 45
+
+        # trend
+        if bullish_alignment:
+            score += 10
+
+        if last_close > ma20_last:
+            score += 5
+
+        # pullback sehat
+        if abs(distance_ma20) <= 3:
+            score += 8
+
+        if -12 <= pullback_pct <= -2:
+            score += 10
+
+        # volume
+        if vol_ratio >= 5:
+            score += 10
+
+        elif vol_ratio >= 3:
+            score += 7
+
+        elif vol_ratio >= 2:
+            score += 5
+
+        # liquidity
+        if traded_value >= 100_000_000_000:
+            score += 10
+
+        elif traded_value >= 50_000_000_000:
+            score += 7
+
+        elif traded_value >= 20_000_000_000:
+            score += 4
+
+        # ======================================================
+        # VOLATILITY SCORE
+        # ======================================================
+
+        # volatility sehat
+        if 12 <= atr_pct <= 20:
+            score += 4
+
+        elif 8 <= atr_pct < 12:
+            score += 2
+
+        # terlalu liar jangan terlalu dibonusin
+        elif atr_pct > 20:
+            score += 1
+
+        # ======================================================
+        # PENALTY
+        # ======================================================
+
+        # terlalu extended dari MA20
+        if distance_ma20 >= 12:
+            score -= 15
+
+        elif distance_ma20 >= 10:
+            score -= 10
+
+        elif distance_ma20 >= 8:
+            score -= 5
+
+        # volatility terlalu kecil
+        if atr_pct < 4:
+            score -= 18
+
+        elif atr_pct < 5:
+            score -= 15
+
+        elif atr_pct < 8:
+            score -= 8
+
+        # trend terlalu liar
+        if trend_stability >= 25:
+            score -= 20
+
+        elif trend_stability >= 20:
+            score -= 12
+
+        elif trend_stability >= 15:
+            score -= 6
+
+        # saham terlalu sideways
+        if abs(return_pct) < 0.3 and atr_pct < 6:
+            score -= 8
+
+        score = int(
+            max(
+                0,
+                min(score, 99)
+            )
+        )
+
+        return score
+
+    except Exception as e:
+
+        print(f"SWING SCORE ERROR: {e}")
+
+        return 0

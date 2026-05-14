@@ -803,6 +803,6 @@ SAHAM_PROFILE = {
     "ZATA": "Bersama Zatta Jaya Tbk.",
     "ZONE": "Mega Perintis Tbk.",
     "ZYRX": "Zyrexindo Mandiri Buana Tbk.",
-    "JKSE": "Index Harga Saham Gabungan",
+    "^JKSE": "Index Harga Saham Gabungan",
 
 }

@@ -14,11 +14,14 @@ from .engine import (
     get_entry_plan
 )
 
+from app.screeners.swing_trade_day import calculate_fast_trade_score
+from app.screeners.swing_trade_week import calculate_swing_trade_score
+from app.core.scanner_bsjp import calculate_bsjp_score
+
 from app.utils.news_engine import fetch_stock_news
 from app.utils.market_data import load_price_data
 from app.renderers.telegram_stock_analysis import render_stock_analysis_message
 from app.services.telegram_bot import send_message
-
 
 # ==========================================================
 # 📊 MAIN STOCK ANALYSIS UI
@@ -47,7 +50,22 @@ def render_stock_analysis():
 
     # ================= RESET =================
     def reset_analysis_state():
-        for k in ["analysis_result", "news_result", "analyzed"]:
+
+        for k in [
+
+            "analysis_result",
+            "analysis_df",
+            "news_result",
+            "analyzed",
+
+            # ================= SCORE =================
+
+            "fast_score",
+            "swing_score",
+            "bsjp_score",
+
+        ]:
+
             st.session_state.pop(k, None)
 
     if st.session_state.get("last_analysis_kode") != kode:
@@ -67,24 +85,76 @@ def render_stock_analysis():
 
     # ================= ANALYZE =================
     if st.button("🔍 Analyze Stock"):
+
         df = load_price_data(kode)
 
         if df.empty:
+
             st.warning("Data harga tidak tersedia.")
+
         else:
+
+            # ==========================================================
+            # MAIN ANALYSIS
+            # ==========================================================
+
             result = analyze_single_stock(df)
+
             result["minor_support"] = calc_minor_support(df)
+
+            # ==========================================================
+            # MULTI STRATEGY SCORE
+            # ==========================================================
+
+            fast_score = calculate_fast_trade_score(df)
+
+            swing_score = calculate_swing_trade_score(df)
+
+            bsjp_score = calculate_bsjp_score(df)
+
+            # ==========================================================
+            # DEBUG
+            # ==========================================================
+
+            print(f"FAST SCORE : {fast_score}")
+
+            print(f"SWING SCORE : {swing_score}")
+
+            print(f"BSJP SCORE : {bsjp_score}")
+
+            # ==========================================================
+            # NEWS
+            # ==========================================================
 
             news_result = fetch_stock_news(kode)
 
+            # ==========================================================
+            # SAVE SESSION
+            # ==========================================================
+
             st.session_state["analysis_result"] = result
+
             st.session_state["analysis_df"] = df
+
             st.session_state["news_result"] = news_result
+
+            st.session_state["fast_score"] = fast_score
+
+            st.session_state["swing_score"] = swing_score
+
+            st.session_state["bsjp_score"] = bsjp_score
 
     if "analysis_result" not in st.session_state:
         return
 
     result = st.session_state["analysis_result"]
+
+    fast_score = st.session_state.get("fast_score", 0)
+
+    swing_score = st.session_state.get("swing_score", 0)
+
+    bsjp_score = st.session_state.get("bsjp_score", 0)
+
     df_price = clean_price_df(st.session_state["analysis_df"])
     news_result = st.session_state.get("news_result", {})
 
@@ -139,6 +209,141 @@ def render_stock_analysis():
         fv_status = "-"
 
     st.markdown(f"**Status: {fv_status}**")
+
+    # ==========================================================
+    # 📊 MULTI STRATEGY SCORE
+    # ==========================================================
+
+    st.subheader("📊 Multi Strategy Score")
+
+    # ================= LOAD SCORE =================
+
+    fast_score = st.session_state.get(
+        "fast_score",
+        0
+    )
+
+    swing_score = st.session_state.get(
+        "swing_score",
+        0
+    )
+
+    bsjp_score = st.session_state.get(
+        "bsjp_score",
+        0
+    )
+
+    # ================= SMART MONEY =================
+
+    sm_result = calculate_smart_money(df_price)
+
+    if sm_result:
+
+        smart_score = int(
+            max(
+                0,
+                min(
+                    sm_result["summary"]["power"],
+                    100
+                )
+            )
+        )
+
+    else:
+
+        smart_score = 0
+
+    # ================= OVERALL SCORE =================
+
+    overall_score = int(
+
+        (
+            fast_score * 0.35 +
+            swing_score * 0.35 +
+            bsjp_score * 0.20 +
+            smart_score * 0.10
+        )
+
+    )
+
+    # ================= LABEL =================
+
+    def score_label(score):
+
+        if score >= 90:
+            return "🔥 Monster"
+
+        elif score >= 80:
+            return "🚀 Strong"
+
+        elif score >= 70:
+            return "⚡ Good"
+
+        elif score >= 60:
+            return "👀 Watchlist"
+
+        else:
+            return "❌ Weak"
+
+    # ================= AI STYLE =================
+
+    if fast_score >= 85 and swing_score < 70:
+
+        ai_style = "🔥 Speculative Momentum"
+
+    elif swing_score >= 80 and fast_score >= 70:
+
+        ai_style = "📈 Healthy Trend"
+
+    elif bsjp_score >= 80 and fast_score >= 80:
+
+        ai_style = "🚀 Breakout Momentum"
+
+    elif overall_score >= 80:
+
+        ai_style = "💰 Strong Accumulation"
+
+    else:
+
+        ai_style = "👀 Mixed Setup"
+
+    # ================= TABLE =================
+
+    score_df = pd.DataFrame({
+
+        "Strategy": [
+
+            "⚡ Fast Trade",
+            "📈 Swing Trade",
+            "🚀 BSJP",
+            "💰 Smart Money",
+            "🧠 Overall",
+        ],
+
+        "Score": [
+
+            fast_score,
+            swing_score,
+            bsjp_score,
+            smart_score,
+            overall_score,
+        ],
+
+        "Status": [
+
+            score_label(fast_score),
+            score_label(swing_score),
+            score_label(bsjp_score),
+            score_label(smart_score),
+            score_label(overall_score),
+        ]
+    })
+
+    st.table(
+        score_df.set_index("Strategy")
+    )
+
+    st.info(ai_style)
 
     # ===================== SUPPORT & RESISTANCE =====================
     st.subheader("📉 Support & Resistance")
