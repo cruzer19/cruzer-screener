@@ -1,41 +1,194 @@
 from typing import List
+
+import asyncio
+
+from concurrent.futures import ThreadPoolExecutor
+
 from app.models.stock_result import StockResult
 from app.screeners import SCREENER_MAP
 
+# ======================================================
+# CONFIG
+# ======================================================
+
+MAX_WORKERS = 13
+
+MAX_CONCURRENT_TASKS = 13
+
+MAX_RETRY = 2
+
+RETRY_DELAY = 0.5
+
+# ======================================================
+# ENGINE
+# ======================================================
 
 class ScreenerEngine:
+
     """
-    Engine hanya bertugas:
-    - menjalankan screener
-    - mengumpulkan StockResult
-    TIDAK melakukan filtering score (biar UI yang pegang kontrol)
+    Stable Async Screener Engine
+
+    Features:
+    - parallel scanning
+    - retry otomatis
+    - semaphore limiter
+    - anti random skip
+    - stable untuk yfinance/API
     """
 
     def __init__(self):
-        pass
 
-    def run(self, saham_list: List[str], screener_type: str) -> List[StockResult]:
+        # thread pool
+        self.executor = ThreadPoolExecutor(
+            max_workers=MAX_WORKERS
+        )
+
+        # limiter async
+        self.semaphore = asyncio.Semaphore(
+            MAX_CONCURRENT_TASKS
+        )
+
+    # ======================================================
+    # ASYNC ANALYZE
+    # ======================================================
+
+    async def analyze_async(
+        self,
+        screener,
+        kode: str
+    ):
+
+        async with self.semaphore:
+
+            loop = asyncio.get_running_loop()
+
+            for attempt in range(MAX_RETRY):
+
+                try:
+
+                    result = await loop.run_in_executor(
+                        self.executor,
+                        screener.analyze,
+                        kode
+                    )
+
+                    return result
+
+                except Exception as e:
+
+                    print(
+                        f"[RETRY {attempt+1}/{MAX_RETRY}] "
+                        f"{kode}: {e}"
+                    )
+
+                    # kasih napas sedikit
+                    await asyncio.sleep(RETRY_DELAY)
+
+            print(f"[FAILED] {kode}")
+
+            return None
+
+    # ======================================================
+    # ASYNC RUNNER
+    # ======================================================
+
+    async def run_async(
+        self,
+        saham_list: List[str],
+        screener_type: str
+    ) -> List[StockResult]:
+
+        # ======================================================
+        # VALIDATION
+        # ======================================================
+
         if screener_type not in SCREENER_MAP:
-            raise ValueError(f"Screener type '{screener_type}' tidak ditemukan")
 
-        screener_cls = SCREENER_MAP[screener_type]
+            raise ValueError(
+                f"Screener type '{screener_type}' "
+                f"tidak ditemukan"
+            )
+
+        # ======================================================
+        # INIT SCREENER
+        # ======================================================
+
+        screener_cls = SCREENER_MAP[
+            screener_type
+        ]
+
         screener = screener_cls()
 
-        results: List[StockResult] = []
+        # ======================================================
+        # CREATE TASKS
+        # ======================================================
 
-        for kode in saham_list:
-            try:
-                res = screener.analyze(kode)
+        tasks = [
 
-                # skip jika tidak ada hasil
-                if res is None:
-                    continue
+            self.analyze_async(
+                screener,
+                kode
+            )
 
-                results.append(res)
+            for kode in saham_list
 
-            except Exception as e:
-                print(f"[ERROR] {kode}: {e}")
+        ]
 
-        # sort by score desc (biar rapi)
-        results.sort(key=lambda x: x.score, reverse=True)
+        # ======================================================
+        # RUN PARALLEL
+        # ======================================================
+
+        results = await asyncio.gather(
+            *tasks,
+            return_exceptions=False
+        )
+
+        # ======================================================
+        # CLEAN RESULTS
+        # ======================================================
+
+        results = [
+
+            r for r in results
+            if r is not None
+
+        ]
+
+        # ======================================================
+        # SORT
+        # ======================================================
+
+        results.sort(
+            key=lambda x: x.score,
+            reverse=True
+        )
+
+        # ======================================================
+        # DEBUG
+        # ======================================================
+
+        print(
+            f"\n✅ SUCCESS SCAN: "
+            f"{len(results)} saham"
+        )
+
         return results
+
+    # ======================================================
+    # PUBLIC RUN
+    # ======================================================
+
+    def run(
+        self,
+        saham_list: List[str],
+        screener_type: str
+    ) -> List[StockResult]:
+
+        return asyncio.run(
+
+            self.run_async(
+                saham_list,
+                screener_type
+            )
+
+        )
