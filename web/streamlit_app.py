@@ -1828,7 +1828,8 @@ def render_strategy_guide():
 Strategi momentum agresif untuk mencari saham yang berpotensi lanjut ARA atau breakout kuat saat market baru buka.
 
 ### Cara Menjalankan
-- Jalankan sekitar jam **09.05 – 09.20 pagi**
+- Jalankan sekitar jam **09.01 – 09.15 pagi** untuk sesi pertama
+- Jalankan sekitar jam **13.31 – 13.45 siang** untuk sesi kedua, hari Jumat bisa disesuaikan
 - Fokus ke **1–2 saham** dengan:
   - score tinggi
   - volume besar
@@ -1839,8 +1840,9 @@ Strategi momentum agresif untuk mencari saham yang berpotensi lanjut ARA atau br
 - Jika harga pullback, boleh lanjut cicil di area support terdekat
 
 ### Risk Management
-- **TP:** sekitar **5–7%**
-- **SL:** sekitar **6–8%**
+- **TP1:** sekitar **4–6%**
+- **TP2:** sekitar **7–9%**
+- **SL:** sekitar **8%**
 
 ### Karakter
 - High risk
@@ -1926,7 +1928,7 @@ maka support terdekat berpotensi:
 - atau terjadi reversal lebih dalam
 
 Karena weak trend biasanya:
-> lebih mudah breakdown dibanding rebound kuat.
+> lebih mudah breakdown ke bawah dibanding rebound.
 
 ### Entry
 - Idealnya entry dilakukan:
@@ -1964,14 +1966,14 @@ Strategi mencari saham yang masih diakumulasi menjelang market tutup dan berpote
 ### Cara Menjalankan
 
 #### Sesi Pertama
-- Jalankan screener jam **15.15 – 15.30**
+- Jalankan screener jam **15.15 – 15.30 sore**
 - Pilih **1–3 saham** dengan:
   - score tinggi
   - volume besar
   - buy pressure kuat
 
 #### Sesi Konfirmasi
-- Jalankan ulang screener jam **15.50 – 16.00**
+- Jalankan ulang screener jam **15.50 – 16.00 sore** sebelum market tutup
 - Fokus pada saham yang muncul kembali di screener
 
 ### Entry
@@ -1980,8 +1982,9 @@ Strategi mencari saham yang masih diakumulasi menjelang market tutup dan berpote
 
 ### Exit Plan
 - Besok pagi langsung pasang:
-  - **TP sekitar 5–7%**
-  - **SL sekitar 6–8%**
+  - **TP1:** sekitar **3–4%**
+  - **TP2:** sekitar **6–7%**
+  - **SL:** sekitar **8%**
 
 ### Karakter
 - Overnight setup
@@ -2004,7 +2007,7 @@ Strategi mencari saham yang masih diakumulasi menjelang market tutup dan berpote
 Strategi overnight sebelum market buka dengan fokus pada saham yang masih memiliki potensi continuation.
 
 ### Cara Menjalankan
-- Jalankan screener sekitar jam **00.00 – 09.00 pagi**
+- Jalankan screener sekitar jam **00.00 – 09.00 pagi** sebelum market buka
 - Pilih **1–2 saham** dengan:
   - score tinggi
   - volume kuat
@@ -2016,13 +2019,11 @@ Strategi overnight sebelum market buka dengan fokus pada saham yang masih memili
   - TP
   - SL sekaligus
 
-### Risk Management
-- **TP:** sekitar **5–7%**
-- **SL:** sekitar **6–8%**
-
 ### Exit Plan
-- Full TP langsung
-- Atau TP bertahap maksimal 2 tahap
+- Langsung pasang:
+  - **TP1:** sekitar **3–4%**
+  - **TP2:** sekitar **6–7%**
+  - **SL:** sekitar **8%**
 
 ### Karakter
 - Lebih konservatif dibanding ARA Hunter
