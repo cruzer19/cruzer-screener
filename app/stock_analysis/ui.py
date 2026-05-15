@@ -137,18 +137,58 @@ def render_stock_analysis():
     trend = result.get("trend", "-")
     st.markdown(f"### {trend}")
 
+    # ======================================================
+    # CLEAN COLUMNS
+    # ======================================================
+
+    df.columns = [
+        c[0] if isinstance(c, tuple) else c
+        for c in df.columns
+    ]
+
+    df.columns = [
+        str(c).upper()
+        for c in df.columns
+    ]
+
+    # ======================================================
+    # ATR
+    # ======================================================
+
+    high = df["HIGH"]
+    low = df["LOW"]
+
+    atr_pct = (
+        (
+            high.tail(14).max()
+            - low.tail(14).min()
+        )
+        / max(last_price, 1)
+    ) * 100
+
     # ================= PRICE INFO =================
-    c1, c2 = st.columns(2)
+    c1, c2, c3 = st.columns(3)
 
     with c1:
-        st.metric("Last Price", f"Rp {int(last_price):,}".replace(",", "."))
+        st.metric(
+            "Last Price",
+            f"Rp {int(last_price):,}".replace(",", ".")
+        )
 
     with c2:
         if ma200:
-            st.metric("Fair Value (MA200)", f"Rp {int(ma200):,}".replace(",", "."))
+            st.metric(
+                "Fair Value (MA200)",
+                f"Rp {int(ma200):,}".replace(",", ".")
+            )
         else:
             st.metric("Fair Value", "-")
 
+    with c3:
+        st.metric(
+            "Volatility",
+            f"{atr_pct:.1f}%"
+        )
     # ================= RANGE =================
     if fair_low and fair_high:
         st.caption(
@@ -459,648 +499,648 @@ def render_stock_analysis():
             f"{'⬆️' if summary['trend_up'] else '⬇️'}"
         )
 
-        # ===================== CYCLE PROJECTION (SMART + ADAPTIVE) =====================
-        st.subheader("📅 Cycle Projection")
+        # # ===================== CYCLE PROJECTION (SMART + ADAPTIVE) =====================
+        # st.subheader("📅 Cycle Projection")
 
-        today = datetime.now().date()
-        cycle = result.get("cycle") if "result" in locals() else None
+        # today = datetime.now().date()
+        # cycle = result.get("cycle") if "result" in locals() else None
 
-        if not cycle:
+        # if not cycle:
 
-            st.warning("Data cycle tidak tersedia")
+        #     st.warning("Data cycle tidak tersedia")
 
-        else:
+        # else:
 
-            import pandas as pd
-            from datetime import timedelta
+        #     import pandas as pd
+        #     from datetime import timedelta
 
-            # ==========================================================
-            # HELPER
-            # ==========================================================
+        #     # ==========================================================
+        #     # HELPER
+        #     # ==========================================================
 
-            def safe_date(key):
+        #     def safe_date(key):
 
-                try:
+        #         try:
 
-                    return datetime.strptime(
-                        cycle.get(key, ""),
-                        "%Y-%m-%d"
-                    ).date()
+        #             return datetime.strptime(
+        #                 cycle.get(key, ""),
+        #                 "%Y-%m-%d"
+        #             ).date()
 
-                except:
+        #         except:
 
-                    return None
+        #             return None
 
-            def fmt(d):
+        #     def fmt(d):
 
-                return (
-                    d.strftime("%d-%b-%Y")
-                    if d else "-"
-                )
+        #         return (
+        #             d.strftime("%d-%b-%Y")
+        #             if d else "-"
+        #         )
 
-            def fmt_range(s, e):
+        #     def fmt_range(s, e):
 
-                return (
-                    f"{fmt(s)} - {fmt(e)}"
-                )
+        #         return (
+        #             f"{fmt(s)} - {fmt(e)}"
+        #         )
 
-            def days_to(d):
+        #     def days_to(d):
 
-                return (
-                    (d - today).days
-                    if d else None
-                )
+        #         return (
+        #             (d - today).days
+        #             if d else None
+        #         )
 
-            def in_range(start, end):
+        #     def in_range(start, end):
 
-                return (
-                    start
-                    and end
-                    and start <= today <= end
-                )
+        #         return (
+        #             start
+        #             and end
+        #             and start <= today <= end
+        #         )
 
-            # ==========================================================
-            # PARSE CYCLE
-            # ==========================================================
+        #     # ==========================================================
+        #     # PARSE CYCLE
+        #     # ==========================================================
 
-            last_low = safe_date("last_low")
+        #     last_low = safe_date("last_low")
 
-            near_low_start = safe_date("next_low_start")
-            near_low_end = safe_date("next_low_end")
+        #     near_low_start = safe_date("next_low_start")
+        #     near_low_end = safe_date("next_low_end")
 
-            next_low_start = safe_date("second_low_start")
-            next_low_end = safe_date("second_low_end")
+        #     next_low_start = safe_date("second_low_start")
+        #     next_low_end = safe_date("second_low_end")
 
-            near_high_start = safe_date("next_high_start")
-            near_high_end = safe_date("next_high_end")
+        #     near_high_start = safe_date("next_high_start")
+        #     near_high_end = safe_date("next_high_end")
 
-            next_high_start = safe_date("second_high_start")
-            next_high_end = safe_date("second_high_end")
+        #     next_high_start = safe_date("second_high_start")
+        #     next_high_end = safe_date("second_high_end")
 
-            # ==========================================================
-            # DEFAULT
-            # ==========================================================
+        #     # ==========================================================
+        #     # DEFAULT
+        #     # ==========================================================
 
-            trend_mode = "sideways"
+        #     trend_mode = "sideways"
 
-            atr_pct = 0
+        #     atr_pct = 0
 
-            cycle_confidence = 0
+        #     cycle_confidence = 0
 
-            # ==========================================================
-            # LOAD PRICE DATA
-            # ==========================================================
+        #     # ==========================================================
+        #     # LOAD PRICE DATA
+        #     # ==========================================================
 
-            df_price = st.session_state.get(
-                "analysis_df"
-            )
+        #     df_price = st.session_state.get(
+        #         "analysis_df"
+        #     )
 
-            if df_price is not None:
+        #     if df_price is not None:
 
-                df_price.columns = [
+        #         df_price.columns = [
 
-                    c[0]
-                    if isinstance(c, tuple)
-                    else c
+        #             c[0]
+        #             if isinstance(c, tuple)
+        #             else c
 
-                    for c in df_price.columns
-                ]
+        #             for c in df_price.columns
+        #         ]
 
-                df_price.columns = [
+        #         df_price.columns = [
 
-                    str(c).upper()
+        #             str(c).upper()
 
-                    for c in df_price.columns
-                ]
+        #             for c in df_price.columns
+        #         ]
 
-            # ==========================================================
-            # MAIN ENGINE
-            # ==========================================================
+        #     # ==========================================================
+        #     # MAIN ENGINE
+        #     # ==========================================================
 
-            if (
-                df_price is not None
-                and len(df_price) > 50
-            ):
+        #     if (
+        #         df_price is not None
+        #         and len(df_price) > 50
+        #     ):
 
-                close = df_price["CLOSE"]
+        #         close = df_price["CLOSE"]
 
-                high = df_price["HIGH"]
+        #         high = df_price["HIGH"]
 
-                low = df_price["LOW"]
+        #         low = df_price["LOW"]
 
-                volume = df_price["VOLUME"]
+        #         volume = df_price["VOLUME"]
 
-                ma20 = close.rolling(20).mean()
+        #         ma20 = close.rolling(20).mean()
 
-                ma50 = close.rolling(50).mean()
+        #         ma50 = close.rolling(50).mean()
 
-                last_price = float(
-                    close.iloc[-1]
-                )
+        #         last_price = float(
+        #             close.iloc[-1]
+        #         )
 
-                # ======================================================
-                # STRUCTURE
-                # ======================================================
+        #         # ======================================================
+        #         # STRUCTURE
+        #         # ======================================================
 
-                hh = (
-                    high.iloc[-1]
-                    >= high.tail(20).max() * 0.98
-                )
+        #         hh = (
+        #             high.iloc[-1]
+        #             >= high.tail(20).max() * 0.98
+        #         )
 
-                hl = (
-                    low.iloc[-1]
-                    > low.tail(20).min()
-                )
+        #         hl = (
+        #             low.iloc[-1]
+        #             > low.tail(20).min()
+        #         )
 
-                # ======================================================
-                # MOMENTUM
-                # ======================================================
+        #         # ======================================================
+        #         # MOMENTUM
+        #         # ======================================================
 
-                momentum = (
-                    (
-                        last_price
-                        - close.iloc[-10]
-                    )
-                    / max(close.iloc[-10], 1)
-                )
+        #         momentum = (
+        #             (
+        #                 last_price
+        #                 - close.iloc[-10]
+        #             )
+        #             / max(close.iloc[-10], 1)
+        #         )
 
-                # ======================================================
-                # VOLUME
-                # ======================================================
+        #         # ======================================================
+        #         # VOLUME
+        #         # ======================================================
 
-                vol_ratio = (
-                    volume.iloc[-1]
-                    / max(
-                        volume.tail(20).mean(),
-                        1
-                    )
-                )
+        #         vol_ratio = (
+        #             volume.iloc[-1]
+        #             / max(
+        #                 volume.tail(20).mean(),
+        #                 1
+        #             )
+        #         )
 
-                # ======================================================
-                # ATR
-                # ======================================================
+        #         # ======================================================
+        #         # ATR
+        #         # ======================================================
 
-                atr_pct = (
-                    (
-                        high.tail(14).max()
-                        - low.tail(14).min()
-                    )
-                    / max(last_price, 1)
-                ) * 100
+        #         atr_pct = (
+        #             (
+        #                 high.tail(14).max()
+        #                 - low.tail(14).min()
+        #             )
+        #             / max(last_price, 1)
+        #         ) * 100
 
-                # ======================================================
-                # TREND MODE
-                # ======================================================
+        #         # ======================================================
+        #         # TREND MODE
+        #         # ======================================================
 
-                if (
+        #         if (
 
-                    last_price > ma50.iloc[-1]
-                    and momentum > 0.07
+        #             last_price > ma50.iloc[-1]
+        #             and momentum > 0.07
 
-                ):
+        #         ):
 
-                    trend_mode = "strong_up"
+        #             trend_mode = "strong_up"
 
-                elif (
+        #         elif (
 
-                    momentum > 0.20
-                    and vol_ratio > 2
-                    and last_price > ma20.iloc[-1]
+        #             momentum > 0.20
+        #             and vol_ratio > 2
+        #             and last_price > ma20.iloc[-1]
 
-                ):
+        #         ):
 
-                    trend_mode = "speculative"
+        #             trend_mode = "speculative"
 
-                elif last_price > ma50.iloc[-1]:
+        #         elif last_price > ma50.iloc[-1]:
 
-                    trend_mode = "up"
+        #             trend_mode = "up"
 
-                elif last_price < ma50.iloc[-1]:
+        #         elif last_price < ma50.iloc[-1]:
 
-                    trend_mode = "down"
+        #             trend_mode = "down"
 
-                # ======================================================
-                # VOLATILITY ADAPTIVE WINDOW
-                # ======================================================
+        #         # ======================================================
+        #         # VOLATILITY ADAPTIVE WINDOW
+        #         # ======================================================
 
-                if atr_pct >= 20:
+        #         if atr_pct >= 20:
 
-                    window_expand = 5
+        #             window_expand = 5
 
-                elif atr_pct >= 10:
+        #         elif atr_pct >= 10:
 
-                    window_expand = 3
+        #             window_expand = 3
 
-                else:
+        #         else:
 
-                    window_expand = 1
+        #             window_expand = 1
 
-                # ======================================================
-                # EXPAND WINDOW
-                # ======================================================
+        #         # ======================================================
+        #         # EXPAND WINDOW
+        #         # ======================================================
 
-                for name in [
+        #         for name in [
 
-                    "near_low_start",
-                    "near_low_end",
-                    "next_low_start",
-                    "next_low_end",
-                    "near_high_start",
-                    "near_high_end",
-                    "next_high_start",
-                    "next_high_end",
+        #             "near_low_start",
+        #             "near_low_end",
+        #             "next_low_start",
+        #             "next_low_end",
+        #             "near_high_start",
+        #             "near_high_end",
+        #             "next_high_start",
+        #             "next_high_end",
 
-                ]:
+        #         ]:
 
-                    value = locals().get(name)
+        #             value = locals().get(name)
 
-                    if value:
+        #             if value:
 
-                        if "start" in name:
+        #                 if "start" in name:
 
-                            locals()[name] = (
-                                value
-                                - timedelta(
-                                    days=window_expand
-                                )
-                            )
+        #                     locals()[name] = (
+        #                         value
+        #                         - timedelta(
+        #                             days=window_expand
+        #                         )
+        #                     )
 
-                        else:
+        #                 else:
 
-                            locals()[name] = (
-                                value
-                                + timedelta(
-                                    days=window_expand
-                                )
-                            )
+        #                     locals()[name] = (
+        #                         value
+        #                         + timedelta(
+        #                             days=window_expand
+        #                         )
+        #                     )
 
-                # ======================================================
-                # VENUS SYNODIC
-                # ======================================================
+        #         # ======================================================
+        #         # VENUS SYNODIC
+        #         # ======================================================
 
-                venus_alignment = cycle.get(
-                    "venus_alignment",
-                    False
-                )
+        #         venus_alignment = cycle.get(
+        #             "venus_alignment",
+        #             False
+        #         )
 
-                if venus_alignment:
+        #         if venus_alignment:
 
-                    cycle_confidence += 15
+        #             cycle_confidence += 15
 
-                # ======================================================
-                # SUN JUPITER
-                # ======================================================
+        #         # ======================================================
+        #         # SUN JUPITER
+        #         # ======================================================
 
-                sun_jupiter_alignment = cycle.get(
-                    "sun_jupiter_alignment",
-                    False
-                )
+        #         sun_jupiter_alignment = cycle.get(
+        #             "sun_jupiter_alignment",
+        #             False
+        #         )
 
-                if sun_jupiter_alignment:
+        #         if sun_jupiter_alignment:
 
-                    if trend_mode in [
-                        "strong_up",
-                        "up"
-                    ]:
+        #             if trend_mode in [
+        #                 "strong_up",
+        #                 "up"
+        #             ]:
 
-                        cycle_confidence += 15
+        #                 cycle_confidence += 15
 
-                    else:
+        #             else:
 
-                        cycle_confidence += 5
+        #                 cycle_confidence += 5
 
-                # ======================================================
-                # TIME GEOMETRY
-                # ======================================================
+        #         # ======================================================
+        #         # TIME GEOMETRY
+        #         # ======================================================
 
-                geometry_score = cycle.get(
-                    "geometry_score",
-                    0
-                )
+        #         geometry_score = cycle.get(
+        #             "geometry_score",
+        #             0
+        #         )
 
-                cycle_confidence += geometry_score
+        #         cycle_confidence += geometry_score
 
-                # ======================================================
-                # TREND QUALITY
-                # ======================================================
+        #         # ======================================================
+        #         # TREND QUALITY
+        #         # ======================================================
 
-                if trend_mode == "up":
+        #         if trend_mode == "up":
 
-                    cycle_confidence += 15
+        #             cycle_confidence += 15
 
-                elif trend_mode == "strong_up":
+        #         elif trend_mode == "strong_up":
 
-                    cycle_confidence += 5
+        #             cycle_confidence += 5
 
-                elif trend_mode == "sideways":
+        #         elif trend_mode == "sideways":
 
-                    cycle_confidence += 15
+        #             cycle_confidence += 15
 
-                elif trend_mode == "down":
+        #         elif trend_mode == "down":
 
-                    cycle_confidence -= 10
+        #             cycle_confidence -= 10
 
-                # ======================================================
-                # MOMENTUM QUALITY
-                # ======================================================
+        #         # ======================================================
+        #         # MOMENTUM QUALITY
+        #         # ======================================================
 
-                if 0.03 <= momentum <= 0.15:
+        #         if 0.03 <= momentum <= 0.15:
 
-                    cycle_confidence += 10
+        #             cycle_confidence += 10
 
-                elif momentum > 0.20:
+        #         elif momentum > 0.20:
 
-                    cycle_confidence -= 12
+        #             cycle_confidence -= 12
 
-                # ======================================================
-                # VOLATILITY QUALITY
-                # ======================================================
+        #         # ======================================================
+        #         # VOLATILITY QUALITY
+        #         # ======================================================
 
-                if 8 <= atr_pct <= 20:
+        #         if 8 <= atr_pct <= 20:
 
-                    cycle_confidence += 15
+        #             cycle_confidence += 15
 
-                elif atr_pct > 30:
+        #         elif atr_pct > 30:
 
-                    cycle_confidence -= 10
+        #             cycle_confidence -= 10
 
-                # ======================================================
-                # STRUCTURE QUALITY
-                # ======================================================
+        #         # ======================================================
+        #         # STRUCTURE QUALITY
+        #         # ======================================================
 
-                if hh and hl:
+        #         if hh and hl:
 
-                    cycle_confidence += 10
+        #             cycle_confidence += 10
 
-                # ======================================================
-                # CLEAN VOLUME
-                # ======================================================
+        #         # ======================================================
+        #         # CLEAN VOLUME
+        #         # ======================================================
 
-                if 1.2 <= vol_ratio <= 2.5:
+        #         if 1.2 <= vol_ratio <= 2.5:
 
-                    cycle_confidence += 5
+        #             cycle_confidence += 5
 
-                # ======================================================
-                # MA20 POSITION
-                # ======================================================
+        #         # ======================================================
+        #         # MA20 POSITION
+        #         # ======================================================
 
-                distance_ma20 = (
-                    (
-                        last_price
-                        - ma20.iloc[-1]
-                    )
-                    / max(ma20.iloc[-1], 1)
-                ) * 100
+        #         distance_ma20 = (
+        #             (
+        #                 last_price
+        #                 - ma20.iloc[-1]
+        #             )
+        #             / max(ma20.iloc[-1], 1)
+        #         ) * 100
 
-                if abs(distance_ma20) <= 3:
+        #         if abs(distance_ma20) <= 3:
 
-                    cycle_confidence += 10
+        #             cycle_confidence += 10
 
-                elif distance_ma20 >= 10:
+        #         elif distance_ma20 >= 10:
 
-                    cycle_confidence -= 10
+        #             cycle_confidence -= 10
 
-                # ======================================================
-                # CYCLE POSITION BONUS
-                # ======================================================
+        #         # ======================================================
+        #         # CYCLE POSITION BONUS
+        #         # ======================================================
 
-                days_to_low = days_to(near_low_start)
+        #         days_to_low = days_to(near_low_start)
 
-                if (
-                    days_to_low is not None
-                    and 0 <= days_to_low <= 10
-                ):
-                    cycle_confidence += 20
+        #         if (
+        #             days_to_low is not None
+        #             and 0 <= days_to_low <= 10
+        #         ):
+        #             cycle_confidence += 20
 
-                if in_range(
-                    near_high_start,
-                    near_high_end
-                ):
+        #         if in_range(
+        #             near_high_start,
+        #             near_high_end
+        #         ):
 
-                    cycle_confidence -= 10
+        #             cycle_confidence -= 10
 
-                # ======================================================
-                # NORMALIZE
-                # ======================================================
+        #         # ======================================================
+        #         # NORMALIZE
+        #         # ======================================================
 
-                cycle_confidence = int(
+        #         cycle_confidence = int(
 
-                    max(
-                        0,
-                        min(
-                            cycle_confidence,
-                            100
-                        )
-                    )
-                )
+        #             max(
+        #                 0,
+        #                 min(
+        #                     cycle_confidence,
+        #                     100
+        #                 )
+        #             )
+        #         )
 
-            # ==========================================================
-            # METRICS
-            # ==========================================================
+        #     # ==========================================================
+        #     # METRICS
+        #     # ==========================================================
 
-            c1, c2 = st.columns(2)
+        #     c1, c2 = st.columns(2)
 
-            c1.metric(
-                "Trend Mode",
-                trend_mode
-                .replace("_", " ")
-                .title()
-            )
+        #     c1.metric(
+        #         "Trend Mode",
+        #         trend_mode
+        #         .replace("_", " ")
+        #         .title()
+        #     )
 
-            c2.metric(
-                "Volatility",
-                f"{atr_pct:.1f}%"
-            )
+        #     c2.metric(
+        #         "Volatility",
+        #         f"{atr_pct:.1f}%"
+        #     )
 
-            # ==========================================================
-            # CURRENT POSITION
-            # ==========================================================
+        #     # ==========================================================
+        #     # CURRENT POSITION
+        #     # ==========================================================
 
-            if in_range(
-                near_low_start,
-                near_low_end
-            ):
+        #     if in_range(
+        #         near_low_start,
+        #         near_low_end
+        #     ):
 
-                if cycle_confidence >= 80:
+        #         if cycle_confidence >= 80:
 
-                    st.success(
-                        "🟢 High Probability Cycle Low"
-                    )
+        #             st.success(
+        #                 "🟢 High Probability Cycle Low"
+        #             )
 
-                elif cycle_confidence >= 65:
+        #         elif cycle_confidence >= 65:
 
-                    st.info(
-                        "⚖️ Medium Confidence Cycle Low"
-                    )
+        #             st.info(
+        #                 "⚖️ Medium Confidence Cycle Low"
+        #             )
 
-                else:
+        #         else:
 
-                    st.warning(
-                        "⚠️ Weak Cycle Low Alignment"
-                    )
+        #             st.warning(
+        #                 "⚠️ Weak Cycle Low Alignment"
+        #             )
 
-            elif in_range(
-                near_high_start,
-                near_high_end
-            ):
+        #     elif in_range(
+        #         near_high_start,
+        #         near_high_end
+        #     ):
 
-                if trend_mode in [
-                    "strong_up",
-                    "speculative"
-                ]:
+        #         if trend_mode in [
+        #             "strong_up",
+        #             "speculative"
+        #         ]:
 
-                    st.info(
-                        "📈 Trend Continuation Zone"
-                    )
+        #             st.info(
+        #                 "📈 Trend Continuation Zone"
+        #             )
 
-                else:
+        #         else:
 
-                    st.warning(
-                        "🔴 Near Cycle High"
-                    )
+        #             st.warning(
+        #                 "🔴 Near Cycle High"
+        #             )
 
-            else:
+        #     else:
 
-                events = [
+        #         events = [
 
-                    (
-                        "Cycle Low",
-                        near_low_start
-                    ),
+        #             (
+        #                 "Cycle Low",
+        #                 near_low_start
+        #             ),
 
-                    (
-                        "Cycle High",
-                        near_high_start
-                    ),
+        #             (
+        #                 "Cycle High",
+        #                 near_high_start
+        #             ),
 
-                    (
-                        "Next Cycle Low",
-                        next_low_start
-                    ),
+        #             (
+        #                 "Next Cycle Low",
+        #                 next_low_start
+        #             ),
 
-                    (
-                        "Next Cycle High",
-                        next_high_start
-                    ),
-                ]
+        #             (
+        #                 "Next Cycle High",
+        #                 next_high_start
+        #             ),
+        #         ]
 
-                future_events = [
+        #         future_events = [
 
-                    (n, d)
+        #             (n, d)
 
-                    for n, d in events
+        #             for n, d in events
 
-                    if d and d >= today
-                ]
+        #             if d and d >= today
+        #         ]
 
-                if future_events:
+        #         if future_events:
 
-                    name, date_event = min(
+        #             name, date_event = min(
 
-                        future_events,
+        #                 future_events,
 
-                        key=lambda x: (
-                            x[1] - today
-                        ).days
-                    )
+        #                 key=lambda x: (
+        #                     x[1] - today
+        #                 ).days
+        #             )
 
-                    d = days_to(date_event)
+        #             d = days_to(date_event)
 
-                    if "Low" in name:
+        #             if "Low" in name:
 
-                        st.info(
-                            f"⏳ {name} ({d} hari lagi)"
-                        )
+        #                 st.info(
+        #                     f"⏳ {name} ({d} hari lagi)"
+        #                 )
 
-                    else:
+        #             else:
 
-                        st.info(
-                            f"📈 {name} ({d} hari lagi)"
-                        )
+        #                 st.info(
+        #                     f"📈 {name} ({d} hari lagi)"
+        #                 )
 
-                else:
+        #         else:
 
-                    st.caption(
-                        "⚖️ Tidak ada event cycle ke depan"
-                    )
+        #             st.caption(
+        #                 "⚖️ Tidak ada event cycle ke depan"
+        #             )
 
-            # ==========================================================
-            # LOW WINDOW TABLE
-            # ==========================================================
+        #     # ==========================================================
+        #     # LOW WINDOW TABLE
+        #     # ==========================================================
 
-            st.markdown(
-                "### 📉 Cycle Low Window"
-            )
+        #     st.markdown(
+        #         "### 📉 Cycle Low Window"
+        #     )
 
-            low_df = pd.DataFrame({
+        #     low_df = pd.DataFrame({
 
-                "Parameter": [
+        #         "Parameter": [
 
-                    "Last Major Low",
+        #             "Last Major Low",
 
-                    "Near Cycle Low",
+        #             "Near Cycle Low",
 
-                    "Next Cycle Low",
-                ],
+        #             "Next Cycle Low",
+        #         ],
 
-                "Value": [
+        #         "Value": [
 
-                    fmt(last_low),
+        #             fmt(last_low),
 
-                    fmt_range(
-                        near_low_start,
-                        near_low_end
-                    ),
+        #             fmt_range(
+        #                 near_low_start,
+        #                 near_low_end
+        #             ),
 
-                    fmt_range(
-                        next_low_start,
-                        next_low_end
-                    ),
-                ],
-            })
+        #             fmt_range(
+        #                 next_low_start,
+        #                 next_low_end
+        #             ),
+        #         ],
+        #     })
 
-            st.table(
-                low_df.set_index(
-                    "Parameter"
-                )
-            )
+        #     st.table(
+        #         low_df.set_index(
+        #             "Parameter"
+        #         )
+        #     )
 
-            # ==========================================================
-            # HIGH WINDOW TABLE
-            # ==========================================================
+        #     # ==========================================================
+        #     # HIGH WINDOW TABLE
+        #     # ==========================================================
 
-            st.markdown(
-                "### 📈 Cycle High Window"
-            )
+        #     st.markdown(
+        #         "### 📈 Cycle High Window"
+        #     )
 
-            high_df = pd.DataFrame({
+        #     high_df = pd.DataFrame({
 
-                "Parameter": [
+        #         "Parameter": [
 
-                    "Near High Window",
+        #             "Near High Window",
 
-                    "Next High Window",
-                ],
+        #             "Next High Window",
+        #         ],
 
-                "Value": [
+        #         "Value": [
 
-                    fmt_range(
-                        near_high_start,
-                        near_high_end
-                    ),
+        #             fmt_range(
+        #                 near_high_start,
+        #                 near_high_end
+        #             ),
 
-                    fmt_range(
-                        next_high_start,
-                        next_high_end
-                    ),
-                ],
-            })
+        #             fmt_range(
+        #                 next_high_start,
+        #                 next_high_end
+        #             ),
+        #         ],
+        #     })
 
-            st.table(
-                high_df.set_index(
-                    "Parameter"
-                )
-            )
+        #     st.table(
+        #         high_df.set_index(
+        #             "Parameter"
+        #         )
+        #     )
 
     # ================= NEWS =================
     st.subheader("📰 News & Sentiment")
