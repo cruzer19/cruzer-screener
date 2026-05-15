@@ -2068,5 +2068,47 @@ elif menu == "⚙️ Trading Tracker - Manage":
 # ==========================================================
 # FOOTER
 # ==========================================================
+
+import os
+
+QRIS_PATH = os.path.join(
+    ROOT_DIR,
+    "assets",
+    "qris.png"
+)
+
 st.markdown("---")
-st.caption("© 2026 Cruzer AI • Stock Screener Engine. All rights reserved.")
+
+col1, col2 = st.columns([3, 1])
+
+with col1:
+
+    st.caption(
+        "© 2026 Cruzer AI • AI-Powered Stock Screener"
+    )
+
+with col2:
+
+    with st.popover("🏠 Help Me Buy a House"):
+
+        st.markdown(
+        """### 🏠 Help Me Buy a House
+
+Kalau tools ini membantu trading kamu, boleh support development via QRIS 🙌
+
+Setiap support membantu agar:  
+• Fitur baru terus bertambah  
+• Developer tetap waras saat market merah 😆  
+• Portofolio kita hijau bersama  
+
+        """
+        )
+
+        st.image(
+            QRIS_PATH,
+            width=300
+        )
+
+        st.caption(
+            "Scan QRIS via mobile banking / e-wallet"
+        )

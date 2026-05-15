@@ -141,22 +141,22 @@ def render_stock_analysis():
     # CLEAN COLUMNS
     # ======================================================
 
-    df.columns = [
+    df_price.columns = [
         c[0] if isinstance(c, tuple) else c
-        for c in df.columns
+        for c in df_price.columns
     ]
 
-    df.columns = [
+    df_price.columns = [
         str(c).upper()
-        for c in df.columns
+        for c in df_price.columns
     ]
 
     # ======================================================
     # ATR
     # ======================================================
 
-    high = df["HIGH"]
-    low = df["LOW"]
+    high = df_price["HIGH"]
+    low = df_price["LOW"]
 
     atr_pct = (
         (
@@ -1147,17 +1147,75 @@ def render_stock_analysis():
 
     sent = news_result.get("sentiment")
 
-    if sent == "POSITIVE":
+    # ======================================================
+    # NO RECENT NEWS
+    # ======================================================
+
+    if sent == "NO_RECENT_NEWS":
+
+        st.info(
+            news_result.get(
+                "message",
+                "Tidak ada berita terbaru"
+            )
+        )
+
+    # ======================================================
+    # POSITIVE
+    # ======================================================
+
+    elif sent == "POSITIVE":
+
         st.success("🟢 Sentimen Positif")
+
+    # ======================================================
+    # NEGATIVE
+    # ======================================================
+
     elif sent == "NEGATIVE":
+
         st.warning("🟠 Sentimen Negatif")
+
+    # ======================================================
+    # SPECULATIVE
+    # ======================================================
+
     elif sent == "SPECULATIVE":
+
         st.error("🎢 Speculative / High Risk")
+
+    # ======================================================
+    # NEUTRAL
+    # ======================================================
+
     else:
+
         st.info("⚪ Netral")
 
-    for n in news_result.get("news", [])[:5]:
-        st.markdown(f"- [{n['title']}]({n['link']})")
+    # ======================================================
+    # NEWS LIST
+    # ======================================================
+
+    if news_result.get("news_count", 0) > 0:
+
+        for n in news_result.get("news", [])[:5]:
+
+            title = n.get("title", "-")
+            link = n.get("link", "#")
+            age = n.get("age_days")
+
+            if age is not None:
+
+                st.markdown(
+                    f"- [{title}]({link}) "
+                    f"• {age} hari lalu"
+                )
+
+            else:
+
+                st.markdown(
+                    f"- [{title}]({link})"
+                )
 
     # ================= INSIGHT =================
     st.subheader("🧠 Insight")

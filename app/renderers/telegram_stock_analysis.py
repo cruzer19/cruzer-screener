@@ -357,20 +357,56 @@ def render_stock_analysis_message(
 
         "SPECULATIVE": "🟣",
 
+        "NO_RECENT_NEWS": "📰",
+
     }.get(sentiment, "⚪")
 
-    news_lines = ""
+    # ==========================================================
+    # NO RECENT NEWS
+    # ==========================================================
 
-    for n in news_result.get("news", [])[:5]:
+    if sentiment == "NO_RECENT_NEWS":
 
-        if n.get("title") and n.get("link"):
-
-            news_lines += (
-                f'• <a href="{n["link"]}">'
-                f'{n["title"]}</a>\n'
+        news_lines = (
+            news_result.get(
+                "message",
+                "Tidak ada berita terbaru"
             )
+        )
 
-    news_lines = news_lines.rstrip()
+    # ==========================================================
+    # NORMAL NEWS
+    # ==========================================================
+
+    else:
+
+        news_lines = ""
+
+        for n in news_result.get("news", [])[:5]:
+
+            if n.get("title") and n.get("link"):
+
+                age = n.get("age_days")
+
+                age_text = (
+                    f" ({age} hari lalu)"
+                    if age is not None
+                    else ""
+                )
+
+                news_lines += (
+
+                    f'• <a href="{n["link"]}">'
+                    f'{n["title"]}</a>'
+                    f'{age_text}\n'
+
+                )
+
+        news_lines = news_lines.rstrip()
+
+        if not news_lines:
+
+            news_lines = "Tidak ada berita terbaru"
 
 # ==========================================================
 # FINAL MESSAGE
