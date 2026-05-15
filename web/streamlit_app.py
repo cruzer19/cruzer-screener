@@ -1062,45 +1062,36 @@ def render_screener():
     # GENERATE HOT LIST
     # ======================================================
 
-    if st.button("🔥 Re-generate HOT List"):
+    ADMIN_USERS = ["Ridho Pradana"]
 
-        try:
+    current_user = st.session_state.get("username", "").strip()
 
-            with st.spinner("Generating HOT_SAHAM_LIST..."):
+    if current_user in ADMIN_USERS:
 
-                result = subprocess.run(
+        if st.button("🔥 Re-generate HOT List"):
 
-                    [sys.executable, HOT_SCRIPT],
+            try:
 
-                    capture_output=True,
-                    text=True
+                with st.spinner("Generating HOT_SAHAM_LIST..."):
 
-                )
+                    result = subprocess.run(
 
-            # reset scanner state
-            st.session_state["scanner_state"] = {
+                        [sys.executable, HOT_SCRIPT],
 
-                "alerted": {},
-                "last_status": {}
+                        capture_output=True,
+                        text=True
 
-            }
+                    )
 
-            st.success(
-                "HOT_SAHAM_LIST berhasil di-generate!"
-            )
+                    if result.returncode == 0:
+                        st.success("HOT_SAHAM_LIST generated successfully!")
 
-            # output terminal
-            st.code(result.stdout)
+                    else:
+                        st.error("Failed generating HOT_SAHAM_LIST")
+                        st.code(result.stderr)
 
-            # kalau ada error
-            if result.stderr:
-                st.error(result.stderr)
-
-        except Exception as e:
-
-            st.error(
-                f"Gagal generate HOT list: {e}"
-            )
+            except Exception as e:
+                st.error(f"Error: {e}")
 
     # ======================================================
     # SELECT TYPE
