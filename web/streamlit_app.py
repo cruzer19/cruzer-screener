@@ -1853,9 +1853,9 @@ Strategi momentum agresif untuk mencari saham yang berpotensi lanjut ARA atau br
 
     st.divider()
 
-    # ======================================================
+    # ==========================================================
     # SWING TRADE
-    # ======================================================
+    # ==========================================================
 
     st.subheader("📈 Swing Trade (Day–Week)")
 
@@ -1890,7 +1890,6 @@ Beberapa hal yang perlu diperhatikan:
 - Support & resistance
 - Gap analysis
 - Smart money
-- Cycle projection
 - Volume & volatility
 - Risk / reward area
 
@@ -1915,20 +1914,20 @@ maka resistance masih berpotensi:
 Karena dalam strong trend:
 > harga bisa tetap naik lebih lama dari ekspektasi market.
 
-#### 📉 Overbought + Trend Melemah
+#### 📉 Oversold tapi Trend Masih Melemah
 Sebaliknya, jika saham:
-- sudah overbought
-- volume mulai melemah
-- momentum turun
-- gagal membuat higher high
-- atau smart money mulai keluar
+- sudah oversold
+- volume masih melemah
+- momentum belum pulih
+- gagal rebound dari support
+- atau smart money masih keluar
 
 maka support terdekat berpotensi:
 - jebol
-- atau terjadi reversal lebih dalam
+- atau terjadi breakdown lebih dalam
 
-Karena weak trend biasanya:
-> lebih mudah breakdown ke bawah dibanding rebound.
+Karena dalam weak trend:
+> saham oversold tetap bisa lanjut turun sebelum benar-benar reversal.
 
 ### Entry
 - Idealnya entry dilakukan:
@@ -2014,7 +2013,9 @@ Strategi overnight sebelum market buka dengan fokus pada saham yang masih memili
   - setup paling bersih
 
 ### Entry
-- Entry langsung dengan:
+- Sebelum market buka, perhatikan area IEP (Indicative Equilibrium Price)
+- Idealnya pasang buy sekitar **2–3 tick di atas area IEP** agar peluang match lebih besar
+- Setelah entry, langsung pasang:
   - Buy
   - TP
   - SL sekaligus
