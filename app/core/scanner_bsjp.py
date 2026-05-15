@@ -1,6 +1,11 @@
 import logging
+import asyncio
+
 from datetime import datetime
+
 import pandas as pd
+
+from concurrent.futures import ThreadPoolExecutor
 
 from app.config.saham_list import SAHAM_LIST
 from app.services.data import get_price_data
@@ -8,179 +13,486 @@ from app.services.telegram_bot import send_message
 
 from zoneinfo import ZoneInfo
 
+# ==========================================================
+# CONFIG
+# ==========================================================
 
-def scan_bsjp(state=None):
+MAX_WORKERS = 9
 
-    if state is None:
-        state = {"alerted": {}}
+executor = ThreadPoolExecutor(
+    max_workers=MAX_WORKERS
+)
+
+# ==========================================================
+# PROCESS SINGLE TICKER
+# ==========================================================
+
+def process_bsjp_ticker_sync(
+    ticker,
+    state
+):
 
     results = []
+
     alerts = []
-    alerted = state.get("alerted", {})
 
-    scanned = 0
+    alerted = state.get(
+        "alerted",
+        {}
+    )
 
-    for ticker in SAHAM_LIST:
+    try:
 
-        try:
-            scanned += 1
+        df = get_price_data(ticker)
 
-            df = get_price_data(ticker)
-            if df is None or df.empty:
-                continue
+        if df is None or df.empty:
 
-            df.columns = [str(c).upper() for c in df.columns]
+            return {
 
-            # ==========================================================
-            # 🔥 AMBIL DATA HARI INI SAJA (INI PALING PENTING)
-            # ==========================================================
-            today = df.index[-1].date()
-            df_today = df[df.index.date == today]
+                "results": [],
 
-            if df_today is None or len(df_today) < 5:
-                continue
+                "alerts": []
 
-            # ================= DATA =================
-            open_price = df_today["OPEN"].iloc[0]
-            close_price = df_today["CLOSE"].iloc[-1]
-            high_price = df_today["HIGH"].max()
+            }
 
-            prev_close = df["CLOSE"].iloc[-len(df_today) - 1]
+        df.columns = [
 
-            # ================= PRICE CHANGE =================
-            price_change = (high_price - open_price) / open_price * 100
+            str(c).upper()
 
-            # ================= VOLUME =================
-            day_vol = df_today["VOLUME"].sum()
-            avg_vol = df["VOLUME"].rolling(20).mean().iloc[-1]
+            for c in df.columns
 
-            vol_ratio = day_vol / avg_vol if avg_vol else 1
+        ]
 
-            if avg_vol < 200_000:
-                continue
+        # ==========================================================
+        # 🔥 AMBIL DATA HARI INI SAJA
+        # ==========================================================
 
-            # ================= MA =================
-            ma5 = df["CLOSE"].rolling(5).mean().iloc[-1]
-            ma20 = df["CLOSE"].rolling(20).mean().iloc[-1]
+        today = df.index[-1].date()
 
-            # ==========================================================
-            # 🔥 FILTER (REALISTIC)
-            # ==========================================================
+        df_today = df[
+            df.index.date == today
+        ]
 
-            if price_change < 2:
-                continue
+        if (
+            df_today is None
+            or len(df_today) < 5
+        ):
 
-            if vol_ratio < 1.1:
-                continue
+            return {
 
-            if close_price < ma20:
-                continue
+                "results": [],
 
-            # ==========================================================
-            # 🔥 NATURAL SCORING SYSTEM (SMOOTH + BALANCED)
-            # ==========================================================
-            score = 0
+                "alerts": []
 
-            # ================= MOMENTUM (MAX ~40) =================
-            # lebih smooth, gak loncat
-            momentum_score = min(price_change * 1.2, 40)
-            score += momentum_score
+            }
 
-            # ================= VOLUME (MAX ~30) =================
-            if vol_ratio >= 1:
-                volume_score = min((vol_ratio - 1) * 15, 30)
-            else:
-                volume_score = -10  # penalti kalau di bawah avg
+        # ================= DATA =================
 
-            score += volume_score
+        open_price = df_today["OPEN"].iloc[0]
 
-            # ================= TREND (MAX ~20) =================
-            trend_score = 0
+        close_price = df_today["CLOSE"].iloc[-1]
 
-            if close_price > ma20:
-                trend_score += 10
+        high_price = df_today["HIGH"].max()
 
-            if close_price > ma5:
-                trend_score += 5
+        prev_close = df["CLOSE"].iloc[
+            -len(df_today) - 1
+        ]
 
-            if ma5 > ma20:
-                trend_score += 5
+        # ================= PRICE CHANGE =================
 
-            score += trend_score
+        price_change = (
 
-            # ================= POSITION BONUS =================
-            # hindari saham yang sudah terlalu tinggi
-            distance_from_ma = (close_price - ma20) / ma20
+            (high_price - open_price)
 
-            if distance_from_ma > 0.3:
-                score -= 15   # terlalu jauh → rawan turun
-            elif distance_from_ma > 0.2:
-                score -= 5
-            elif distance_from_ma < 0.05:
-                score += 5    # dekat MA → bagus buat lanjut
+            / max(open_price, 1)
 
-            # ================= FINAL NORMALIZE =================
-            score = int(max(0, min(100, score)))
+        ) * 100
 
-            status = "🚀 BSJP Momentum"
+        # ================= VOLUME =================
 
-            print(
-                f"BSJP: {ticker} | score={score} | "
-                f"chg={price_change:.2f}% | vol={vol_ratio:.2f}"
+        day_vol = df_today["VOLUME"].sum()
+
+        avg_vol = (
+
+            df["VOLUME"]
+
+            .rolling(20)
+
+            .mean()
+
+            .iloc[-1]
+
+        )
+
+        vol_ratio = (
+
+            day_vol / avg_vol
+
+            if avg_vol else 1
+
+        )
+
+        if avg_vol < 200_000:
+
+            return {
+
+                "results": [],
+
+                "alerts": []
+
+            }
+
+        # ================= MA =================
+
+        ma5 = (
+
+            df["CLOSE"]
+
+            .rolling(5)
+
+            .mean()
+
+            .iloc[-1]
+
+        )
+
+        ma20 = (
+
+            df["CLOSE"]
+
+            .rolling(20)
+
+            .mean()
+
+            .iloc[-1]
+
+        )
+
+        # ==========================================================
+        # 🔥 FILTER
+        # ==========================================================
+
+        if price_change < 2:
+            return {
+
+                "results": [],
+
+                "alerts": []
+
+            }
+
+        if vol_ratio < 1.1:
+            return {
+
+                "results": [],
+
+                "alerts": []
+
+            }
+
+        if close_price < ma20:
+            return {
+
+                "results": [],
+
+                "alerts": []
+
+            }
+
+        # ==========================================================
+        # 🔥 SCORING
+        # ==========================================================
+
+        score = 0
+
+        # ================= MOMENTUM =================
+
+        momentum_score = min(
+            price_change * 1.2,
+            40
+        )
+
+        score += momentum_score
+
+        # ================= VOLUME =================
+
+        if vol_ratio >= 1:
+
+            volume_score = min(
+                (vol_ratio - 1) * 15,
+                30
             )
 
-            # ================= SAVE =================
-            results.append({
-                "Kode": ticker,
-                "Harga": int(close_price),
-                "Score": score,
-                "Status": status,
-                "Volume": round(vol_ratio, 2)
-            })
+        else:
 
-            # ================= ALERT =================
-            key = f"{ticker}_bsjp"
+            volume_score = -10
 
-            if key not in alerted and score >= 75:
+        score += volume_score
 
-                now = datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%d %b %Y %H:%M:%S")
+        # ================= TREND =================
 
-                msg = (
-                    f"🚀 <b>BSJP MOMENTUM</b>\n"
-                    f"<b>{ticker}</b> @ {int(close_price)}\n"
-                    f"⭐ <b>Score : {score}</b>\n"
-                    f"📊 Vol      : {vol_ratio:.2f}x\n"
-                    f"📈 Change : {price_change:.2f}%\n"
-                    f"⏰ {now}"
-                )
+        trend_score = 0
 
-                try:
-                    send_message(msg)
-                except Exception:
-                    pass
+        if close_price > ma20:
+            trend_score += 10
 
-                alerts.append(msg)
-                alerted[key] = True
+        if close_price > ma5:
+            trend_score += 5
 
-        except Exception as e:
-            logging.error(f"❌ ERROR {ticker}: {e}")
-            continue
+        if ma5 > ma20:
+            trend_score += 5
+
+        score += trend_score
+
+        # ================= POSITION BONUS =================
+
+        distance_from_ma = (
+            (close_price - ma20)
+            / ma20
+        )
+
+        if distance_from_ma > 0.3:
+
+            score -= 15
+
+        elif distance_from_ma > 0.2:
+
+            score -= 5
+
+        elif distance_from_ma < 0.05:
+
+            score += 5
+
+        # ================= FINAL =================
+
+        score = int(
+
+            max(
+                0,
+                min(100, score)
+            )
+
+        )
+
+        status = "🚀 BSJP Momentum"
+
+        print(
+
+            f"BSJP: {ticker} | "
+
+            f"score={score} | "
+
+            f"chg={price_change:.2f}% | "
+
+            f"vol={vol_ratio:.2f}"
+
+        )
+
+        # ================= SAVE =================
+
+        results.append({
+
+            "Kode": ticker,
+
+            "Harga": int(close_price),
+
+            "Score": score,
+
+            "Status": status,
+
+            "Volume": round(
+                vol_ratio,
+                2
+            )
+
+        })
+
+        # ================= ALERT =================
+
+        key = f"{ticker}_bsjp"
+
+        if (
+
+            key not in alerted
+
+            and score >= 75
+
+        ):
+
+            now = datetime.now(
+
+                ZoneInfo("Asia/Jakarta")
+
+            ).strftime(
+
+                "%d %b %Y %H:%M:%S"
+
+            )
+
+            msg = (
+
+                f"🚀 <b>BSJP MOMENTUM</b>\n"
+
+                f"<b>{ticker}</b> @ "
+
+                f"{int(close_price)}\n"
+
+                f"⭐ <b>Score : {score}</b>\n"
+
+                f"📊 Vol      : "
+
+                f"{vol_ratio:.2f}x\n"
+
+                f"📈 Change : "
+
+                f"{price_change:.2f}%\n"
+
+                f"⏰ {now}"
+
+            )
+
+            try:
+
+                send_message(msg)
+
+            except Exception:
+
+                pass
+
+            alerts.append(msg)
+
+            alerted[key] = True
+
+        return {
+
+            "results": results,
+
+            "alerts": alerts
+
+        }
+
+    except Exception as e:
+
+        logging.error(
+            f"❌ ERROR {ticker}: {e}"
+        )
+
+        return {
+
+            "results": [],
+
+            "alerts": []
+
+        }
+
+# ==========================================================
+# ASYNC WRAPPER
+# ==========================================================
+
+async def process_bsjp_ticker(
+    ticker,
+    state
+):
+
+    loop = asyncio.get_running_loop()
+
+    return await loop.run_in_executor(
+
+        executor,
+
+        process_bsjp_ticker_sync,
+
+        ticker,
+
+        state
+
+    )
+
+# ==========================================================
+# MAIN ASYNC SCAN
+# ==========================================================
+
+async def scan_bsjp_async(state=None):
+
+    if state is None:
+
+        state = {
+
+            "alerted": {}
+
+        }
+
+    scanned = len(SAHAM_LIST)
+
+    results = []
+
+    alerts = []
+
+    # ==========================================================
+    # TASKS
+    # ==========================================================
+
+    tasks = [
+
+        process_bsjp_ticker(
+            ticker,
+            state
+        )
+
+        for ticker in SAHAM_LIST
+
+    ]
+
+    outputs = await asyncio.gather(
+        *tasks
+    )
+
+    # ==========================================================
+    # MERGE RESULTS
+    # ==========================================================
+
+    for out in outputs:
+
+        results.extend(
+            out.get("results", [])
+        )
+
+        alerts.extend(
+            out.get("alerts", [])
+        )
 
     # ================= OUTPUT =================
+
     df = pd.DataFrame(results)
 
     if not df.empty:
-        df = df.sort_values(by=["Score"], ascending=False).reset_index(drop=True)
+
+        df = df.sort_values(
+            by=["Score"],
+            ascending=False
+        ).reset_index(drop=True)
+
         df.index = df.index + 1
+
         df = df.head(10)
 
-    state["alerted"] = alerted
-
     print(f"\nBSJP SCAN: {scanned}")
+
     print(f"RESULT: {len(results)}")
+
     print(f"ALERT: {len(alerts)}\n")
 
     return df, alerts, state
+
+# ==========================================================
+# PUBLIC FUNCTION
+# ==========================================================
+
+def scan_bsjp(state=None):
+
+    return asyncio.run(
+        scan_bsjp_async(state)
+    )
 
 # ==========================================================
 # 📊 SINGLE STOCK BSJP SCORE
