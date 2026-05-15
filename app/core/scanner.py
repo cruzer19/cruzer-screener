@@ -60,14 +60,53 @@ def process_ticker_sync(
 
     try:
 
-        df = get_price_data(ticker)
+        # ======================================================
+        # RETRY FETCH DATA
+        # ======================================================
+
+        MAX_RETRY = 2
+
+        RETRY_DELAY = 0.5
+
+        df = None
+
+        for attempt in range(MAX_RETRY):
+
+            try:
+
+                df = get_price_data(ticker)
+
+                if df is not None and not df.empty:
+
+                    break
+
+            except Exception as e:
+
+                logging.warning(
+
+                    f"[RETRY {attempt+1}/{MAX_RETRY}] "
+                    f"{ticker}: {e}"
+
+                )
+
+            time.sleep(RETRY_DELAY)
+
+        # ======================================================
+        # FAILED FETCH
+        # ======================================================
 
         if df is None or df.empty:
+
             return {
+
                 "results": [],
+
                 "alerts": [],
+
                 "movers": 0
+
             }
+
 
         df.columns = [
             str(c).upper()
@@ -385,7 +424,7 @@ def process_ticker_sync(
 
         # ================= RESULT =================
 
-        if score >= 70:
+        if score >= 60:
 
             results.append({
 
@@ -525,7 +564,7 @@ async def scan_day_async(state=None):
 
         df.index = df.index + 1
 
-        df = df.head(10)
+        df = df.head(15)
 
     print(f"\nSCAN: {scanned}")
 

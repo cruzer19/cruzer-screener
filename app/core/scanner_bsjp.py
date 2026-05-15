@@ -58,7 +58,40 @@ def process_bsjp_ticker_sync(
 
     try:
 
-        df = get_price_data(ticker)
+        # ==========================================================
+        # RETRY FETCH DATA
+        # ==========================================================
+
+        MAX_RETRY = 2
+
+        RETRY_DELAY = 1.0
+
+        df = None
+
+        for attempt in range(MAX_RETRY):
+
+            try:
+
+                df = get_price_data(ticker)
+
+                if df is not None and not df.empty:
+
+                    break
+
+            except Exception as e:
+
+                logging.warning(
+
+                    f"[RETRY {attempt+1}/{MAX_RETRY}] "
+                    f"{ticker}: {e}"
+
+                )
+
+            time.sleep(RETRY_DELAY)
+
+        # ==========================================================
+        # FAILED FETCH
+        # ==========================================================
 
         if df is None or df.empty:
 
@@ -304,23 +337,23 @@ def process_bsjp_ticker_sync(
         )
 
         # ================= SAVE =================
+        if score >= 50:
+            results.append({
 
-        results.append({
+                "Kode": ticker,
 
-            "Kode": ticker,
+                "Harga": int(close_price),
 
-            "Harga": int(close_price),
+                "Score": score,
 
-            "Score": score,
+                "Status": status,
 
-            "Status": status,
+                "Volume": round(
+                    vol_ratio,
+                    2
+                )
 
-            "Volume": round(
-                vol_ratio,
-                2
-            )
-
-        })
+            })
 
         # ================= ALERT =================
 
@@ -489,7 +522,7 @@ async def scan_bsjp_async(state=None):
 
         df.index = df.index + 1
 
-        df = df.head(10)
+        df = df.head(15)
 
     print(f"\nBSJP SCAN: {scanned}")
 

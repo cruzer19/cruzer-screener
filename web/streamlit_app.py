@@ -939,7 +939,7 @@ def render_screener():
 
                 result = subprocess.run(
 
-                    ["python", HOT_SCRIPT],
+                    [sys.executable, HOT_SCRIPT],
 
                     capture_output=True,
                     text=True
