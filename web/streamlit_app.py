@@ -53,9 +53,140 @@ from app.core.dividend_engine import DividendEngine
 # ==========================================================
 # PAGE CONFIG
 # ==========================================================
-st.set_page_config(page_title="Cruzer AI Screener", layout="wide")
-st.title("🤖 Stock Screener Dashboard (Beta)")
-st.caption("AI-powered multi-strategy stock screening")
+
+st.set_page_config(
+    page_title="Cruzer Screener",
+    layout="wide"
+)
+
+# ==========================================================
+# LOGIN CONFIG
+# ==========================================================
+
+APP_PASSWORD = st.secrets.get(
+    "APP_PASSWORD",
+    os.getenv("APP_PASSWORD")
+)
+
+# ==========================================================
+# SESSION INIT
+# ==========================================================
+
+if "logged_in" not in st.session_state:
+
+    st.session_state.logged_in = False
+
+if "username" not in st.session_state:
+
+    st.session_state.username = ""
+
+# ==========================================================
+# LOGIN PAGE
+# ==========================================================
+
+if not st.session_state.logged_in:
+
+    left, center, right = st.columns([1.5, 2, 1.5])
+
+    with center:
+
+        st.markdown(
+            """
+            <h1 style='text-align: center;'>
+                🔐 CRUZER Screener
+            </h1>
+            """,
+            unsafe_allow_html=True
+        )
+
+        st.caption(
+            "Private dashboard access"
+        )
+
+        username = st.text_input(
+            "Nama",
+            max_chars=25
+        )
+        
+
+
+        password = st.text_input(
+            "Password",
+            type="password"
+        )
+
+        if st.button(
+            "Login",
+            use_container_width=True
+        ):
+
+            if password == APP_PASSWORD:
+
+                st.session_state.logged_in = True
+
+                st.session_state.username = username
+
+                st.rerun()
+
+            else:
+
+                st.error(
+                    "❌ Password salah"
+                )
+
+    st.stop()
+
+# ==========================================================
+# HEADER
+# ==========================================================
+
+st.title(
+    "🤖 Stock Screener Dashboard (Beta)"
+)
+
+st.caption(
+    "AI-powered multi-strategy stock screening"
+)
+
+
+# ==========================================================
+# SIDEBAR USER MENU
+# ==========================================================
+
+with st.sidebar:
+
+    username = st.session_state.username
+
+    short_name = (
+        username[:25]
+        if username
+        else "US"
+    )
+
+    with st.popover(
+        f"👤 {short_name}"
+    ):
+
+        st.markdown(
+            f"### {username}"
+        )
+
+        st.caption(
+            "Cruzer Screener Dashboard"
+        )
+
+        st.divider()
+
+        if st.button(
+            "🚪 Logout",
+            use_container_width=True
+        ):
+
+            st.session_state.logged_in = False
+
+            st.session_state.username = ""
+
+            st.rerun()
 
 # ==========================================================
 # ======================= HELPERS ==========================
@@ -910,7 +1041,7 @@ def scan_week(min_price=None, max_price=None):
 
 def render_screener():
 
-    st.header("📊 CRUZER AI - SCREENER")
+    st.header("📊 CRUZER - SCREENER")
 
     import subprocess
 
