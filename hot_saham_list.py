@@ -1,0 +1,20 @@
+HOT_SAHAM_LIST = [
+
+    "ADCP", "ALII", "AMMN", "ANTM", "APIC", "APLN", "ASHA", "ASLI", "ASPR", "ATLA", 
+    "BAIK", "BAPA", "BBCA", "BBRI", "BCIP", "BDMN", "BEEF", "BEER", "BELL", "BFIN", 
+    "BIPI", "BIPP", "BKDP", "BKSL", "BMRI", "BMTR", "BNBR", "BOBA", "BREN", "BRMS", 
+    "BRPT", "BSML", "BUKA", "BULL", "BUMI", "BUVA", "BWPT", "CASH", "CDIA", "CITY", 
+    "COAL", "COCO", "COIN", "CPRO", "CSMI", "CTTH", "CUAN", "DADA", "DEFI", "DEWA", 
+    "DFAM", "DKHH", "DMAS", "DOOH", "DPUM", "DSSA", "EMTK", "ENRG", "ENZO", "EPAC", 
+    "ESIP", "ESSA", "ESTI", "FILM", "FUJI", "FUTR", "GIAA", "GMFI", "GOTO", "GPSO", 
+    "GRIA", "GRPH", "GSMF", "GTSI", "GULA", "GZCO", "HALO", "HOPE", "HRME", "HYGN", 
+    "IATA", "ICON", "INDS", "INET", "ISAT", "JGLE", "KAEF", "KAQI", "KETR", "KICI", 
+    "KIJA", "KING", "KJEN", "KOBX", "KOKA", "KOTA", "KPIG", "KRYA", "LABS", "LAND", 
+    "LAPD", "LCKM", "LMPI", "MANG", "MAPI", "MAXI", "MBMA", "MBSS", "MDIA", "MEDS", 
+    "MINA", "MMIX", "MPOW", "MPXL", "MSIE", "MSIN", "MSJA", "NEST", "NICL", "NINE", 
+    "NTBK", "OASA", "OILS", "PACK", "PADI", "PBSA", "PEGE", "PKPK", "PPRE", "PRIM", 
+    "PSDN", "PTMP", "PTRO", "RBMS", "RCCC", "REAL", "RISE", "RMKO", "RODA", "RSCH", 
+    "SDMU", "SIMP", "SMBR", "SOFA", "SPRE", "SRSN", "SSIA", "TAMA", "TLKM", "TOOL", 
+    "TOTL", "TPIA", "TRIN", "TRON", "TRUE", "UVCR", "VISI", "WBSA", "WINS", "WMUU", 
+    "YELO", "ZATA", 
+]

@@ -7,11 +7,26 @@ import pandas as pd
 
 from concurrent.futures import ThreadPoolExecutor
 
-from app.config.saham_list import SAHAM_LIST
 from app.services.data import get_price_data
 from app.services.telegram_bot import send_message
 
 from zoneinfo import ZoneInfo
+
+# ======================================================
+# HOT LIST PRIORITY
+# ======================================================
+
+try:
+
+    from app.config.hot_saham_list import HOT_SAHAM_LIST as SAHAM_LIST
+
+    print("🔥 USING HOT_SAHAM_LIST")
+
+except:
+
+    from app.config.saham_list import SAHAM_LIST
+
+    print("📦 USING FULL SAHAM_LIST")
 
 # ==========================================================
 # CONFIG

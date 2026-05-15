@@ -548,7 +548,7 @@ def scan_week(min_price=None, max_price=None):
     engine = ScreenerEngine()
 
     results = engine.run(
-        SAHAM_LIST[:850],
+        SAHAM_LIST[:1000],
         "swing_trade_week"
     )
 
@@ -912,22 +912,64 @@ def render_screener():
 
     st.header("📊 CRUZER AI - SCREENER")
 
+    import subprocess
+
     # ======================================================
-    # RESET
+    # PATH
     # ======================================================
 
-    if st.button("Reset Scanner"):
+    BASE_DIR = os.getcwd()
 
-        st.session_state["scanner_state"] = {
+    HOT_SCRIPT = os.path.join(
+        BASE_DIR,
+        "app",
+        "config",
+        "convert_idx_hot.py"
+    )
 
-            "alerted": {},
+    # ======================================================
+    # GENERATE HOT LIST
+    # ======================================================
 
-            "last_status": {}
-        }
+    if st.button("🔥 Re-generate HOT List"):
 
-        st.success(
-            "Scanner berhasil di-reset"
-        )
+        try:
+
+            with st.spinner("Generating HOT_SAHAM_LIST..."):
+
+                result = subprocess.run(
+
+                    ["python", HOT_SCRIPT],
+
+                    capture_output=True,
+                    text=True
+
+                )
+
+            # reset scanner state
+            st.session_state["scanner_state"] = {
+
+                "alerted": {},
+                "last_status": {}
+
+            }
+
+            st.success(
+                "HOT_SAHAM_LIST berhasil di-generate!"
+            )
+
+            # output terminal
+            st.code(result.stdout)
+
+            # kalau ada error
+            if result.stderr:
+                st.error(result.stderr)
+
+        except Exception as e:
+
+            st.error(
+                f"Gagal generate HOT list: {e}"
+            )
 
     # ======================================================
     # SELECT TYPE
