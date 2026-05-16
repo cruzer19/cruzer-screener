@@ -2275,7 +2275,7 @@ Setiap support membantu agar:
 
         st.image(
             QRIS_PATH,
-            width=300
+            width=310
         )
 
         st.caption(
