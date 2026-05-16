@@ -7,6 +7,33 @@ from app.core.data_loader import load_daily_data
 from app.utils.helpers import round_down, round_up
 
 
+# ======================================================
+# GET LAST VALID INDEX
+# ======================================================
+
+def get_last_valid_idx(volume_series):
+
+    idx = -1
+
+    # cek max 5 candle ke belakang
+    for i in range(1, 6):
+
+        current_idx = -i
+
+        vol = float(
+            volume_series.iloc[current_idx]
+        )
+
+        # ada transaksi
+        if vol > 0:
+
+            idx = current_idx
+
+            break
+
+    return idx
+
+
 class SwingTradeWeekScreener(BaseScreener):
 
     """
@@ -48,21 +75,23 @@ class SwingTradeWeekScreener(BaseScreener):
 
         volume = df["Volume"]
 
+        idx = get_last_valid_idx(volume)
+
         # ======================================================
         # LAST VALUE
         # ======================================================
 
-        last_close = float(close.iloc[-1])
+        last_close = float(close.iloc[idx])
 
-        prev_close = float(close.iloc[-2])
+        prev_close = float(close.iloc[idx - 1])
 
-        last_open = float(open_price.iloc[-1])
+        last_open = float(open_price.iloc[idx])
 
-        last_high = float(high.iloc[-1])
+        last_high = float(high.iloc[idx])
 
-        last_low = float(low.iloc[-1])
+        last_low = float(low.iloc[idx])
 
-        vol_last = float(volume.iloc[-1])
+        vol_last = float(volume.iloc[idx])
 
         # ======================================================
         # MOVING AVERAGE
@@ -76,13 +105,13 @@ class SwingTradeWeekScreener(BaseScreener):
 
         ma100 = close.rolling(100).mean()
 
-        ma5_last = float(ma5.iloc[-1])
+        ma5_last = float(ma5.iloc[idx])
 
-        ma20_last = float(ma20.iloc[-1])
+        ma20_last = float(ma20.iloc[idx])
 
-        ma50_last = float(ma50.iloc[-1])
+        ma50_last = float(ma50.iloc[idx])
 
-        ma100_last = float(ma100.iloc[-1])
+        ma100_last = float(ma100.iloc[idx])
 
         # ======================================================
         # VOLUME
@@ -90,7 +119,7 @@ class SwingTradeWeekScreener(BaseScreener):
 
         vol_ma20 = volume.rolling(20).mean()
 
-        vol_ma20_last = float(vol_ma20.iloc[-1])
+        vol_ma20_last = float(vol_ma20.iloc[idx])
 
         vol_ratio = (
             vol_last / max(vol_ma20_last, 1)
@@ -212,11 +241,11 @@ class SwingTradeWeekScreener(BaseScreener):
         )
 
         ma20_uptrend = (
-            ma20.iloc[-1] > ma20.iloc[-5]
+            ma20.iloc[idx] > ma20.iloc[idx - 4]
         )
 
         ma50_uptrend = (
-            ma50.iloc[-1] > ma50.iloc[-5]
+            ma50.iloc[idx] > ma50.iloc[idx - 4]
         )
 
         # ======================================================
@@ -803,7 +832,11 @@ def calculate_swing_trade_score(df):
 
         volume = df["volume"]
 
-        last_close = float(close.iloc[-1])
+        idx = get_last_valid_idx(volume)
+
+        last_close = float(close.iloc[idx])
+
+        prev_close = float(close.iloc[idx - 1])
 
         # ======================================================
         # MOVING AVERAGE
@@ -815,11 +848,11 @@ def calculate_swing_trade_score(df):
 
         ma100 = close.rolling(100).mean()
 
-        ma20_last = float(ma20.iloc[-1])
+        ma20_last = float(ma20.iloc[idx])
 
-        ma50_last = float(ma50.iloc[-1])
+        ma50_last = float(ma50.iloc[idx])
 
-        ma100_last = float(ma100.iloc[-1])
+        ma100_last = float(ma100.iloc[idx])
 
         # ======================================================
         # VOLUME
@@ -828,12 +861,12 @@ def calculate_swing_trade_score(df):
         vol_ma20 = volume.rolling(20).mean()
 
         vol_ratio = (
-            volume.iloc[-1]
-            / max(vol_ma20.iloc[-1], 1)
+            volume.iloc[idx]
+            / max(vol_ma20.iloc[idx], 1)
         )
 
         traded_value = (
-            last_close * volume.iloc[-1]
+            last_close * volume.iloc[idx]
         )
 
         # ======================================================
@@ -861,6 +894,24 @@ def calculate_swing_trade_score(df):
         atr_pct = (
             (high.tail(14).max() - low.tail(14).min())
             / max(last_close, 1)
+        ) * 100
+
+        # ======================================================
+        # RETURN %
+        # ======================================================
+
+        return_pct = (
+            (last_close - prev_close)
+            / max(prev_close, 1)
+        ) * 100
+
+        # ======================================================
+        # TREND STABILITY
+        # ======================================================
+
+        trend_stability = (
+            close.tail(20).std()
+            / max(close.tail(20).mean(), 1)
         ) * 100
 
         # ======================================================
