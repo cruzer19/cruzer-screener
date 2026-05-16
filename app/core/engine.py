@@ -11,11 +11,11 @@ from app.screeners import SCREENER_MAP
 # CONFIG
 # ======================================================
 
-MAX_WORKERS = 13
+MAX_WORKERS = 11
 
-MAX_CONCURRENT_TASKS = 13
+MAX_CONCURRENT_TASKS = 11
 
-MAX_RETRY = 2
+MAX_RETRY = 3
 
 RETRY_DELAY = 0.5
 

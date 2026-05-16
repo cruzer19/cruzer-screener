@@ -911,7 +911,7 @@ def scan_week(min_price=None, max_price=None):
 
             near_entry = (
 
-                distance_entry <= 0.08
+                distance_entry <= 0.03
             )
 
             # ==================================================
@@ -920,7 +920,7 @@ def scan_week(min_price=None, max_price=None):
 
             too_extended = (
 
-                distance >= 0.10
+                distance >= 0.06
             )
 
             # ==================================================
@@ -941,7 +941,14 @@ def scan_week(min_price=None, max_price=None):
 
                 and
 
-                score >= 70
+                setup in [
+
+                    "🔥 Elite Rebound",
+
+                    "🚀 Strong Pullback",
+
+                    "⚡ Healthy Setup"
+                ]
             )
 
             # ==================================================
@@ -998,7 +1005,14 @@ def scan_week(min_price=None, max_price=None):
 
                 "Score": score,
 
-                "Setup": setup,
+                "Setup": (
+
+                    setup
+
+                    if ready_entry
+
+                    else "👀 Watchlist"
+                ),
 
                 "Trend": trend,
 
