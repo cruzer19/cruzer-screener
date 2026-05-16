@@ -3,7 +3,7 @@
 # ==========================================================
 import sys
 import os
-from datetime import date
+from datetime import date, datetime, timedelta
 import pytz
 
 tz = pytz.timezone("Asia/Jakarta")
@@ -25,6 +25,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
+
 from app.core.engine import ScreenerEngine
 from app.core.scanner_bsjp import scan_bsjp
 from app.config.saham_list import SAHAM_LIST
@@ -37,6 +38,7 @@ from app.services.logic import detect_day_trade, detect_market_mover
 from app.services.data import get_price_data
 from app.utils.news_engine import fetch_stock_news
 
+from streamlit_cookies_manager import EncryptedCookieManager
 from app.stock_analysis.ui import render_stock_analysis
 
 from app.tracker.tracker import (
@@ -69,6 +71,22 @@ APP_PASSWORD = st.secrets.get(
 )
 
 # ==========================================================
+# COOKIE MANAGER
+# ==========================================================
+
+cookies = EncryptedCookieManager(
+
+    prefix="cruzer_",
+
+    password="cruzer-super-secret-cookie-key"
+
+)
+
+if not cookies.ready():
+
+    st.stop()
+
+# ==========================================================
 # SESSION INIT
 # ==========================================================
 
@@ -79,6 +97,58 @@ if "logged_in" not in st.session_state:
 if "username" not in st.session_state:
 
     st.session_state.username = ""
+
+# ==========================================================
+# AUTO LOGIN FROM COOKIE
+# ==========================================================
+
+saved_login = cookies.get("logged_in")
+
+saved_username = cookies.get("username")
+
+saved_expiry = cookies.get("expiry")
+
+if (
+    saved_login == "true"
+    and saved_username
+    and saved_expiry
+):
+
+    try:
+
+        expiry_date = datetime.fromisoformat(
+            saved_expiry
+        )
+
+        # ======================
+        # STILL VALID
+        # ======================
+
+        if datetime.now() < expiry_date:
+
+            st.session_state.logged_in = True
+
+            st.session_state.username = (
+                saved_username
+            )
+
+        # ======================
+        # EXPIRED
+        # ======================
+
+        else:
+
+            cookies["logged_in"] = ""
+
+            cookies["username"] = ""
+
+            cookies["expiry"] = ""
+
+            cookies.save()
+
+    except:
+
+        pass
 
 # ==========================================================
 # LOGIN PAGE
@@ -107,8 +177,6 @@ if not st.session_state.logged_in:
             "Nama",
             max_chars=25
         )
-        
-
 
         password = st.text_input(
             "Password",
@@ -122,9 +190,32 @@ if not st.session_state.logged_in:
 
             if password == APP_PASSWORD:
 
+                # ======================
+                # SESSION
+                # ======================
+
                 st.session_state.logged_in = True
 
                 st.session_state.username = username
+
+                # ======================
+                # SAVE COOKIE
+                # ======================
+
+                expiry_date = (
+                    datetime.now()
+                    + timedelta(days=6)
+                )
+
+                cookies["logged_in"] = "true"
+
+                cookies["username"] = username
+
+                cookies["expiry"] = (
+                    expiry_date.isoformat()
+                )
+
+                cookies.save()
 
                 st.rerun()
 
@@ -145,7 +236,7 @@ st.title(
 )
 
 st.caption(
-    "AI-powered multi-strategy stock screening"
+    "Multi-strategy stock screening"
 )
 
 
@@ -172,7 +263,7 @@ with st.sidebar:
         )
 
         st.caption(
-            "Cruzer Screener Dashboard"
+            "CRUZER Screener Dashboard"
         )
 
         st.divider()
@@ -182,9 +273,23 @@ with st.sidebar:
             use_container_width=True
         ):
 
+            # ======================
+            # CLEAR SESSION
+            # ======================
+
             st.session_state.logged_in = False
 
             st.session_state.username = ""
+
+            # ======================
+            # CLEAR COOKIE
+            # ======================
+
+            cookies["logged_in"] = ""
+
+            cookies["username"] = ""
+
+            cookies.save()
 
             st.rerun()
 
@@ -303,12 +408,75 @@ def calc_minor_support(df, lookback=12):
     return None
 
 # =============================
-# CACHE (biar scan gak berat)
+# CACHE
+# =============================
+
+import os
+import pandas as pd
+
+from datetime import datetime
+
+CACHE_FILE = (
+    "data/dividend_cache.parquet"
+)
+
+# =============================
+# CHECK CACHE
+# =============================
+
+def is_cache_today(path):
+
+    if not os.path.exists(path):
+
+        return False
+
+    modified_date = datetime.fromtimestamp(
+        os.path.getmtime(path)
+    ).date()
+
+    return (
+        modified_date
+        == datetime.now().date()
+    )
+
+# =============================
+# LOAD DIVIDEND DATA
 # =============================
 
 @st.cache_data(ttl=3600)
+
 def load_dividend_data(symbols):
-    return DividendEngine.scan(symbols)
+
+    # ======================
+    # USE CACHE
+    # ======================
+
+    if is_cache_today(CACHE_FILE):
+
+        return pd.read_parquet(
+            CACHE_FILE
+        )
+
+    # ======================
+    # RE-SCAN
+    # ======================
+
+    df = DividendEngine.scan(symbols)
+
+    # ======================
+    # SAVE CACHE
+    # ======================
+
+    os.makedirs(
+        "data",
+        exist_ok=True
+    )
+
+    df.to_parquet(
+        CACHE_FILE
+    )
+
+    return df
 
 
 def render_dividend_screener():
@@ -1041,7 +1209,7 @@ def scan_week(min_price=None, max_price=None):
 
 def render_screener():
 
-    st.header("📊 CRUZER - SCREENER")
+    st.header("📊 CRUZER - Screener")
 
     import subprocess
 
@@ -2085,7 +2253,7 @@ col1, col2 = st.columns([3, 1])
 with col1:
 
     st.caption(
-        "© 2026 Cruzer AI • AI-Powered Stock Screener"
+        "© 2026 Cruzer Screener • AI-Powered Stock Screener"
     )
 
 with col2:
