@@ -58,6 +58,7 @@ from app.core.dividend_engine import DividendEngine
 
 st.set_page_config(
     page_title="Cruzer Screener",
+    page_icon="assets/logo-thumb.png",
     layout="wide"
 )
 
@@ -160,17 +161,10 @@ if not st.session_state.logged_in:
 
     with center:
 
-        st.markdown(
-            """
-            <h1 style='text-align: center;'>
-                🔐 CRUZER Screener
-            </h1>
-            """,
-            unsafe_allow_html=True
-        )
+        st.image("assets/logo-login.png", width=600)
 
         st.caption(
-            "Private dashboard access"
+            "🔐 Private dashboard access"
         )
 
         username = st.text_input(
@@ -1223,7 +1217,7 @@ def scan_week(min_price=None, max_price=None):
 
 def render_screener():
 
-    st.header("📊 CRUZER - Screener")
+    st.header("📊 Stock Screener")
 
     with st.expander("📌 **Important Notes**"):
 
