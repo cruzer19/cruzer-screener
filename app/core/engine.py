@@ -17,7 +17,7 @@ MAX_CONCURRENT_TASKS = 11
 
 MAX_RETRY = 3
 
-RETRY_DELAY = 0.5
+RETRY_DELAY = 0.7
 
 # ======================================================
 # ENGINE

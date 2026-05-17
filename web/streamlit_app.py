@@ -1225,6 +1225,17 @@ def render_screener():
 
     st.header("📊 CRUZER - Screener")
 
+    with st.expander("📌 **Important Notes**"):
+
+        st.markdown(
+            """
+    - Sebelum menggunakan screener, disarankan membaca panduan di menu **📘 Strategy Guide**
+    - Untuk menu **ARA Hunter** dan **BSJP**, lakukan scan beberapa kali jika hasil tidak ditemukan atau hanya sedikit, karena:
+        - Scanner berjalan sangat cepat sehingga memungkinkan beberapa emiten terlewat pada scan tertentu
+        - Re-scan biasanya dapat membantu menangkap momentum dan kandidat tambahan
+    """
+        )
+
     import subprocess
 
     # ======================================================

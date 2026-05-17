@@ -64,7 +64,7 @@ def process_bsjp_ticker_sync(
 
         MAX_RETRY = 2
 
-        RETRY_DELAY = 1.0
+        RETRY_DELAY = 0.7
 
         df = None
 

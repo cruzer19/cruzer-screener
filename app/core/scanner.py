@@ -66,7 +66,7 @@ def process_ticker_sync(
 
         MAX_RETRY = 2
 
-        RETRY_DELAY = 0.5
+        RETRY_DELAY = 0.7
 
         df = None
 
